@@ -1,0 +1,17 @@
+{
+  "name": "memex",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"API,WEB,EXT\" --prefix-colors \"blue,green,yellow\" \"pnpm --filter @memex/api dev\" \"pnpm --filter @memex/web dev\" \"pnpm --filter @memex/extension dev\"",
+    "dev:api": "pnpm --filter @memex/api dev",
+    "dev:web": "pnpm --filter @memex/web dev",
+    "dev:ext": "pnpm --filter @memex/extension dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "concurrently": "^8.0.0"
+  }
+}
