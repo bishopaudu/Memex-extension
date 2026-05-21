@@ -83,8 +83,9 @@ export const usersRelations = relations(users, ({ many }) => ({
 }))
 
 export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
-  user:         one(users, { fields: [bookmarks.userId], references: [users.id] }),
-  bookmarkTags: many(bookmarkTags),
+  user:                one(users, { fields: [bookmarks.userId], references: [users.id] }),
+  bookmarkTags:        many(bookmarkTags),
+  bookmarkCollections: many(bookmarkCollections),
 }))
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({
@@ -95,4 +96,41 @@ export const tagsRelations = relations(tags, ({ one, many }) => ({
 export const bookmarkTagsRelations = relations(bookmarkTags, ({ one }) => ({
   bookmark: one(bookmarks, { fields: [bookmarkTags.bookmarkId], references: [bookmarks.id] }),
   tag:      one(tags,      { fields: [bookmarkTags.tagId],      references: [tags.id] }),
+}))
+
+// ─────────────────────────────────────────────
+// COLLECTIONS
+// ─────────────────────────────────────────────
+export const collections = pgTable('collections', {
+  id:          uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name:        text('name').notNull(),
+  description: text('description'),
+  color:       text('color').default('#4f6ef7'),
+  icon:        text('icon').default('📁'),
+  isPublic:    boolean('is_public').default(false),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ─────────────────────────────────────────────
+// BOOKMARK ↔ COLLECTION (many-to-many)
+// ─────────────────────────────────────────────
+export const bookmarkCollections = pgTable('bookmark_collections', {
+  bookmarkId:   uuid('bookmark_id').notNull().references(() => bookmarks.id, { onDelete: 'cascade' }),
+  collectionId: uuid('collection_id').notNull().references(() => collections.id, { onDelete: 'cascade' }),
+  addedAt:      timestamp('added_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.bookmarkId, table.collectionId] }),
+}))
+
+// Relations
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  user:                one(users, { fields: [collections.userId], references: [users.id] }),
+  bookmarkCollections: many(bookmarkCollections),
+}))
+
+export const bookmarkCollectionsRelations = relations(bookmarkCollections, ({ one }) => ({
+  bookmark:   one(bookmarks,   { fields: [bookmarkCollections.bookmarkId],   references: [bookmarks.id] }),
+  collection: one(collections, { fields: [bookmarkCollections.collectionId], references: [collections.id] }),
 }))

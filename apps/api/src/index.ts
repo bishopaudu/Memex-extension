@@ -3,10 +3,11 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { HTTPException } from 'hono/http-exception'
-import authRouter      from './routes/auth'
-import bookmarksRouter from './routes/bookmarks'
-import tagsRouter      from './routes/tags'
-import uploadRouter    from './routes/upload'
+import authRouter        from './routes/auth'
+import bookmarksRouter   from './routes/bookmarks'
+import tagsRouter        from './routes/tags'
+import uploadRouter      from './routes/upload'
+import collectionsRouter from './routes/collections'
 
 const app = new Hono()
 
@@ -25,25 +26,20 @@ app.use('*', cors({
   credentials:  true,
 }))
 
-app.route('/api/auth',      authRouter)
-app.route('/api/bookmarks', bookmarksRouter)
-app.route('/api/tags',      tagsRouter)
-app.route('/api/upload',    uploadRouter)
+app.route('/api/auth',        authRouter)
+app.route('/api/bookmarks',   bookmarksRouter)
+app.route('/api/tags',        tagsRouter)
+app.route('/api/upload',      uploadRouter)
+app.route('/api/collections', collectionsRouter)
 
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
 app.onError((err, c) => {
   console.error('[Error]', err)
   if (err instanceof HTTPException) {
-    return c.json({
-      data:  null,
-      error: { code: 'HTTP_ERROR', message: err.message }
-    }, err.status)
+    return c.json({ data: null, error: { code: 'HTTP_ERROR', message: err.message } }, err.status)
   }
-  return c.json({
-    data:  null,
-    error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' }
-  }, 500)
+  return c.json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }, 500)
 })
 
 app.notFound((c) =>

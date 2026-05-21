@@ -1,43 +1,36 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { bookmarksApi, tagsApi } from '../lib/api'
+import { bookmarksApi, tagsApi, collectionsApi } from '../lib/api'
 import { BookmarkCard } from '../components/BookmarkCard'
-import { Spinner } from '../components/Spinner'
+import { Sidebar }      from '../components/Sidebar'
 
 export function DashboardPage() {
   const { auth, logout } = useAuth()
 
-  const [bookmarks, setBookmarks] = useState<any[]>([])
-  const [tags,      setTags]      = useState<any[]>([])
-  const [search,    setSearch]    = useState('')
-  const [activeTag, setActiveTag] = useState('')
-  const [loading,   setLoading]   = useState(true)
-
-  // Debounced search — wait 300ms after user stops typing
-  // before hitting the API. Avoids hammering the server
-  // on every keystroke.
+  const [bookmarks,   setBookmarks]   = useState<any[]>([])
+  const [tags,        setTags]        = useState<any[]>([])
+  const [collections, setCollections] = useState<any[]>([])
+  const [search,      setSearch]      = useState('')
+  const [activeTag,   setActiveTag]   = useState('')
+  const [activeCollection, setActiveCollection] = useState('')
+  const [loading,     setLoading]     = useState(true)
+  const [view,        setView]        = useState<'grid' | 'list'>('grid')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
   }, [search])
 
-  // Fetch bookmarks whenever search or tag filter changes
-  useEffect(() => {
-    fetchBookmarks()
-  }, [debouncedSearch, activeTag])
-
-  // Fetch tags once on mount
-  useEffect(() => {
-    fetchTags()
-  }, [])
+  useEffect(() => { fetchBookmarks() }, [debouncedSearch, activeTag, activeCollection])
+  useEffect(() => { fetchTags(); fetchCollections() }, [])
 
   async function fetchBookmarks() {
     setLoading(true)
     const result = await bookmarksApi.list({
-      search: debouncedSearch,
-      tag:    activeTag,
+      search:       debouncedSearch,
+      tag:          activeTag,
+      collectionId: activeCollection,
     })
     if (!result.error) setBookmarks(result.data.items)
     setLoading(false)
@@ -48,191 +41,204 @@ export function DashboardPage() {
     if (!result.error) setTags(result.data.items)
   }
 
-  async function handleDelete(id: string) {
-    // Optimistic update — remove from UI immediately
-    // If the API call fails, we refetch to restore
-    setBookmarks(prev => prev.filter(b => b.id !== id))
-
-    const result = await bookmarksApi.delete(id)
-    if (result.error) {
-      // API failed — restore by refetching
-      fetchBookmarks()
-    } else {
-      // Success — refresh tags in case counts changed
-      fetchTags()
-    }
+  async function fetchCollections() {
+    const result = await collectionsApi.list()
+    if (!result.error) setCollections(result.data.items)
   }
 
-  function handleTagClick(tagName: string) {
-    // Toggle tag filter
-    setActiveTag(prev => prev === tagName ? '' : tagName)
+  async function handleDelete(id: string) {
+    setBookmarks(prev => prev.filter(b => b.id !== id))
+    const result = await bookmarksApi.delete(id)
+    if (result.error) fetchBookmarks()
+    else fetchTags()
+  }
+
+  function handleTagClick(tag: string) {
+    setActiveTag(tag)
+    setActiveCollection('')
+    setSearch('')
+  }
+
+  function handleCollectionClick(id: string) {
+    setActiveCollection(id)
+    setActiveTag('')
     setSearch('')
   }
 
   const user = auth.status === 'authenticated' ? auth.user : null
 
+  const activeCollectionName = collections.find(c => c.id === activeCollection)?.name
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-surface-0">
+      <Sidebar
+        tags={tags}
+        collections={collections}
+        activeTag={activeTag}
+        activeCollection={activeCollection}
+        bookmarkCount={bookmarks.length}
+        onTagClick={handleTagClick}
+        onCollectionClick={handleCollectionClick}
+        onCollectionsChange={fetchCollections}
+        userEmail={user?.email ?? ''}
+        onLogout={logout}
+      />
 
-      {/* Top navigation */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
+      {/* Main */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-surface-1">
 
-          {/* Logo */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 bg-primary-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xs">M</span>
-            </div>
-            <span className="font-semibold text-gray-800">Memex</span>
+        {/* Top bar */}
+        <header className="h-12 border-b border-surface-4 flex items-center
+                           gap-3 px-5 flex-shrink-0">
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs text-ink-3">
+            <span>Memex</span>
+            {activeCollection && (
+              <>
+                <span className="text-ink-5">/</span>
+                <span className="text-ink-2">{activeCollectionName}</span>
+              </>
+            )}
+            {activeTag && (
+              <>
+                <span className="text-ink-5">/</span>
+                <span className="text-brand-bright">#{activeTag}</span>
+              </>
+            )}
           </div>
 
-          {/* Search bar — center, takes available space */}
-          <div className="flex-1 max-w-xl">
+          {/* Search */}
+          <div className="flex-1 max-w-md ml-4">
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                   fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-4"
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
               <input
                 type="text"
-                placeholder="Search your bookmarks..."
+                placeholder="Search bookmarks..."
                 value={search}
-                onChange={e => { setSearch(e.target.value); setActiveTag('') }}
-                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200
-                           rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500
-                           focus:border-transparent focus:bg-white transition-colors
-                           placeholder-gray-400"
+                onChange={e => { setSearch(e.target.value); setActiveTag(''); setActiveCollection('') }}
+                className="w-full pl-8 pr-3 py-1.5 bg-surface-3 border border-surface-4
+                           rounded-lg text-xs text-ink-1 placeholder-ink-4 outline-none
+                           focus:border-brand transition-colors"
               />
             </div>
           </div>
 
-          {/* User menu */}
-          <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-            <span className="text-xs text-gray-500 hidden sm:block">
-              {user?.name ?? user?.email}
-            </span>
+          {/* View toggle */}
+          <div className="flex items-center gap-0.5 bg-surface-3 rounded-md p-0.5 ml-auto">
             <button
-              onClick={logout}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors
-                         px-3 py-1.5 rounded-lg hover:bg-gray-100"
+              onClick={() => setView('grid')}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors
+                          ${view === 'grid' ? 'bg-surface-4 text-ink-1' : 'text-ink-4 hover:text-ink-2'}`}
             >
-              Sign out
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors
+                          ${view === 'list' ? 'bg-surface-4 text-ink-1' : 'text-ink-4 hover:text-ink-2'}`}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-6 flex gap-6">
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto p-5">
 
-        {/* Sidebar — tags */}
-        <aside className="w-48 flex-shrink-0 hidden md:block">
-          <div className="bg-white rounded-xl border border-gray-100 p-4 sticky top-20">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Tags
-            </h3>
-
-            {/* All bookmarks */}
-            <button
-              onClick={() => { setActiveTag(''); setSearch('') }}
-              className={`w-full text-left px-2 py-1.5 rounded-lg text-sm
-                          transition-colors mb-1
-                          ${!activeTag
-                            ? 'bg-primary-50 text-primary-700 font-medium'
-                            : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-              All bookmarks
-            </button>
-
-            {/* Tag list */}
-            {tags.map(tag => (
-              <button
-                key={tag.id}
-                onClick={() => handleTagClick(tag.name)}
-                className={`w-full text-left px-2 py-1.5 rounded-lg text-sm
-                            transition-colors flex items-center justify-between
-                            ${activeTag === tag.name
-                              ? 'bg-primary-50 text-primary-700 font-medium'
-                              : 'text-gray-600 hover:bg-gray-50'}`}
-              >
-                <span className="truncate">{tag.name}</span>
-                <span className="text-xs text-gray-400 ml-1 flex-shrink-0">
-                  {tag.count}
-                </span>
-              </button>
-            ))}
-
-            {tags.length === 0 && (
-              <p className="text-xs text-gray-400 px-2">
-                Tags will appear here after you save bookmarks
-              </p>
-            )}
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <main className="flex-1 min-w-0">
-
-          {/* Active filters indicator */}
+          {/* Active filter pills */}
           {(activeTag || debouncedSearch) && (
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-sm text-gray-500">Showing results for:</span>
               {activeTag && (
-                <span className="flex items-center gap-1 px-2 py-1 bg-primary-50
-                                 text-primary-700 text-xs rounded-full">
+                <span className="flex items-center gap-1 px-2 py-1 bg-brand/10
+                                 text-brand-bright text-xs rounded-full border border-brand/20">
                   #{activeTag}
-                  <button onClick={() => setActiveTag('')} className="hover:text-primary-900">×</button>
+                  <button onClick={() => setActiveTag('')}
+                          className="hover:text-white transition-colors ml-0.5">×</button>
                 </span>
               )}
               {debouncedSearch && (
-                <span className="flex items-center gap-1 px-2 py-1 bg-gray-100
-                                 text-gray-600 text-xs rounded-full">
+                <span className="flex items-center gap-1 px-2 py-1 bg-surface-3
+                                 text-ink-2 text-xs rounded-full border border-surface-4">
                   "{debouncedSearch}"
-                  <button onClick={() => setSearch('')} className="hover:text-gray-800">×</button>
+                  <button onClick={() => setSearch('')}
+                          className="hover:text-ink-1 transition-colors ml-0.5">×</button>
                 </span>
               )}
             </div>
           )}
 
-          {/* Bookmark count */}
+          {/* Count */}
           {!loading && (
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-[11px] text-ink-4 mb-4">
               {bookmarks.length} {bookmarks.length === 1 ? 'bookmark' : 'bookmarks'}
             </p>
           )}
 
-          {/* Loading state */}
+          {/* Loading */}
           {loading && (
-            <div className="flex items-center justify-center py-20">
-              <Spinner size="lg" />
+            <div className="flex items-center justify-center py-24">
+              <div className="w-5 h-5 border-2 border-brand border-t-transparent
+                              rounded-full animate-spin" />
             </div>
           )}
 
           {/* Empty state */}
           {!loading && bookmarks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center
-                              justify-center mb-4">
-                <span className="text-3xl">🔖</span>
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-14 h-14 bg-surface-3 rounded-2xl flex items-center
+                              justify-center mb-4 border border-surface-4">
+                <svg className="w-6 h-6 text-ink-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" strokeWidth={1.5}>
+                  <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                </svg>
               </div>
-              <h3 className="text-sm font-medium text-gray-700 mb-1">
-                {debouncedSearch || activeTag ? 'No results found' : 'No bookmarks yet'}
-              </h3>
-              <p className="text-xs text-gray-400 max-w-xs">
-                {debouncedSearch || activeTag
-                  ? 'Try a different search or tag'
-                  : 'Install the Memex extension and click it on any webpage to save your first bookmark'}
+              <p className="text-sm font-medium text-ink-2 mb-1">
+                {debouncedSearch || activeTag || activeCollection
+                  ? 'Nothing found'
+                  : 'No bookmarks yet'}
+              </p>
+              <p className="text-xs text-ink-4 max-w-xs">
+                {debouncedSearch || activeTag || activeCollection
+                  ? 'Try a different search or filter'
+                  : 'Use the Memex extension to save your first bookmark'}
               </p>
             </div>
           )}
 
-          {/* Bookmark grid */}
-          {!loading && bookmarks.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {bookmarks.map(bookmark => (
+          {/* Grid view */}
+          {!loading && bookmarks.length > 0 && view === 'grid' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {bookmarks.map(b => (
                 <BookmarkCard
-                  key={bookmark.id}
-                  bookmark={bookmark}
+                  key={b.id}
+                  bookmark={b}
+                  collections={collections}
+                  onDelete={handleDelete}
+                  onTagClick={handleTagClick}
+                  onCollectionsChange={fetchCollections}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* List view */}
+          {!loading && bookmarks.length > 0 && view === 'list' && (
+            <div className="flex flex-col gap-1">
+              {bookmarks.map(b => (
+                <ListRow
+                  key={b.id}
+                  bookmark={b}
                   onDelete={handleDelete}
                   onTagClick={handleTagClick}
                 />
@@ -241,6 +247,74 @@ export function DashboardPage() {
           )}
         </main>
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// List row — compact view
+// ─────────────────────────────────────────────
+function ListRow({ bookmark, onDelete, onTagClick }: {
+  bookmark:   any
+  onDelete:   (id: string) => void
+  onTagClick: (tag: string) => void
+}) {
+  let domain = ''
+  try { domain = new URL(bookmark.url).hostname.replace('www.', '') } catch {}
+
+  function timeAgo(date: string) {
+    const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    if (s < 3600)  return `${Math.floor(s / 60)}m`
+    if (s < 86400) return `${Math.floor(s / 3600)}h`
+    return `${Math.floor(s / 86400)}d`
+  }
+
+  return (
+    <div className="group flex items-center gap-3 px-3 py-2 rounded-lg
+                    hover:bg-surface-2 transition-colors border border-transparent
+                    hover:border-surface-4">
+      {bookmark.faviconUrl && (
+        <img src={bookmark.faviconUrl} alt="" className="w-4 h-4 flex-shrink-0"
+             onError={e => (e.currentTarget.style.display = 'none')} />
+      )}
+
+      <a href={bookmark.url} target="_blank" rel="noopener noreferrer"
+         className="flex-1 min-w-0">
+        <p className="text-xs text-ink-1 truncate hover:text-brand-bright transition-colors">
+          {bookmark.title ?? domain}
+        </p>
+        <p className="text-[10px] text-ink-4 truncate">{domain}</p>
+      </a>
+
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {bookmark.tags.slice(0, 3).map((tag: any) => (
+          <button
+            key={tag.id}
+            onClick={() => onTagClick(tag.name)}
+            className="px-1.5 py-0.5 bg-brand/10 text-brand-bright text-[9px]
+                       rounded hover:bg-brand/20 transition-colors"
+          >
+            {tag.name}
+          </button>
+        ))}
+      </div>
+
+      <span className="text-[10px] text-ink-4 flex-shrink-0 w-6">
+        {timeAgo(bookmark.createdAt)}
+      </span>
+
+      <button
+        onClick={() => onDelete(bookmark.id)}
+        className="opacity-0 group-hover:opacity-100 transition-opacity
+                   w-5 h-5 flex items-center justify-center rounded text-ink-4
+                   hover:text-red-400 hover:bg-red-400/10 transition-colors"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" strokeWidth={2}>
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14H6L5 6"/>
+        </svg>
+      </button>
     </div>
   )
 }
