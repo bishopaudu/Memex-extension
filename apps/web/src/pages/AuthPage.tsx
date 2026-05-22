@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { ThemeToggle } from '../components/ThemeToggle'
 
-export function AuthPage() {
+interface Props {
+  theme:       'dark' | 'light'
+  toggleTheme: () => void
+}
+
+export function AuthPage({ theme, toggleTheme }: Props) {
   const [mode,     setMode]     = useState<'login' | 'signup'>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -33,17 +39,20 @@ export function AuthPage() {
   return (
     <div className="min-h-screen bg-surface-0 flex items-center justify-center p-4">
 
-      {/* Background grid pattern */}
+      {/* Background grid */}
       <div className="fixed inset-0 opacity-[0.03]"
            style={{
-             backgroundImage: `linear-gradient(#fff 1px, transparent 1px),
-                               linear-gradient(90deg, #fff 1px, transparent 1px)`,
+             backgroundImage: `linear-gradient(var(--ink1) 1px, transparent 1px),
+                               linear-gradient(90deg, var(--ink1) 1px, transparent 1px)`,
              backgroundSize: '40px 40px'
            }} />
 
-      <div className="relative w-full max-w-sm">
+      {/* Theme toggle — top right */}
+      <div className="fixed top-4 right-4">
+        <ThemeToggle theme={theme} toggle={toggleTheme} />
+      </div>
 
-        {/* Logo */}
+      <div className="relative w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-lg">M</span>
@@ -51,7 +60,6 @@ export function AuthPage() {
           <span className="text-2xl font-bold text-ink-1">Memex</span>
         </div>
 
-        {/* Card */}
         <div className="bg-surface-2 border border-surface-4 rounded-2xl p-8">
           <h1 className="text-base font-semibold text-ink-1 mb-1">
             {mode === 'login' ? 'Welcome back' : 'Create account'}
@@ -138,10 +146,6 @@ export function AuthPage() {
             </button>
           </p>
         </div>
-
-        <p className="text-center text-[10px] text-ink-5 mt-6">
-          Your visual memory for the internet
-        </p>
       </div>
     </div>
   )

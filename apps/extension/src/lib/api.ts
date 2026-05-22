@@ -79,3 +79,19 @@ export const uploadApi = {
     })
   },
 }
+
+export const attachmentsApi = {
+  async createText(bookmarkId: string, content: string, label?: string) {
+    return apiFetch<{ attachment: any }>('/api/attachments', {
+      method: 'POST',
+      body:   JSON.stringify({ type: 'text', bookmarkId, content, label }),
+    })
+  },
+
+  async createAreaScreenshot(bookmarkId: string, imageDataUrl: string, label?: string) {
+    return apiFetch<{ attachment: any }>('/api/attachments', {
+      method: 'POST',
+      body:   JSON.stringify({ type: 'area_screenshot', bookmarkId, imageDataUrl, label }),
+    })
+  },
+}

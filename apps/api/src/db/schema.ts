@@ -86,6 +86,7 @@ export const bookmarksRelations = relations(bookmarks, ({ one, many }) => ({
   user:                one(users, { fields: [bookmarks.userId], references: [users.id] }),
   bookmarkTags:        many(bookmarkTags),
   bookmarkCollections: many(bookmarkCollections),
+  attachments:         many(attachments),
 }))
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({
@@ -133,4 +134,29 @@ export const collectionsRelations = relations(collections, ({ one, many }) => ({
 export const bookmarkCollectionsRelations = relations(bookmarkCollections, ({ one }) => ({
   bookmark:   one(bookmarks,   { fields: [bookmarkCollections.bookmarkId],   references: [bookmarks.id] }),
   collection: one(collections, { fields: [bookmarkCollections.collectionId], references: [collections.id] }),
+}))
+
+// ─────────────────────────────────────────────
+// ATTACHMENTS
+// A bookmark can have multiple attachments
+// Each has a type: screenshot | area_screenshot | text | image
+// ─────────────────────────────────────────────
+export const attachmentTypeEnum = ['screenshot', 'area_screenshot', 'text', 'image'] as const
+export type  AttachmentType     = typeof attachmentTypeEnum[number]
+
+export const attachments = pgTable('attachments', {
+  id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  bookmarkId: uuid('bookmark_id').notNull().references(() => bookmarks.id, { onDelete: 'cascade' }),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type:       text('type').notNull(),           // 'screenshot' | 'area_screenshot' | 'text' | 'image'
+  content:    text('content'),                  // text content for text attachments
+  url:        text('url'),                      // cloudinary URL for image/screenshot attachments
+  storageKey: text('storage_key'),              // cloudinary public_id for deletion
+  label:      text('label'),                    // optional user label e.g. "Key diagram"
+  createdAt:  timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  bookmark: one(bookmarks, { fields: [attachments.bookmarkId], references: [bookmarks.id] }),
+  user:     one(users,     { fields: [attachments.userId],     references: [users.id] }),
 }))

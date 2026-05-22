@@ -1,7 +1,7 @@
 import { useState, KeyboardEvent } from 'react'
 
 interface Props {
-  tags: string[]
+  tags:     string[]
   onChange: (tags: string[]) => void
 }
 
@@ -30,27 +30,27 @@ export function TagInput({ tags, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1 p-2 border border-gray-200 rounded-lg
-                    min-h-[38px] focus-within:ring-2 focus-within:ring-primary-500
-                    focus-within:border-transparent">
+    <div className="flex flex-wrap gap-1 p-2 bg-[#161616] border border-[#252525]
+                    rounded-lg min-h-[38px] focus-within:border-[#4f6ef7]
+                    transition-colors">
       {tags.map(tag => (
-        <span key={tag} className="flex items-center gap-1 px-2 py-0.5
-                                    bg-primary-50 text-primary-700 text-xs rounded-md">
+        <span key={tag}
+              className="flex items-center gap-1 px-2 py-0.5 bg-[#1a1f3a]
+                         text-[#7b93ff] text-[10px] rounded">
           {tag}
-          <button onClick={() => removeTag(tag)} className="hover:text-primary-900 leading-none">
-            ×
-          </button>
+          <button onClick={() => removeTag(tag)}
+                  className="hover:text-white transition-colors leading-none">×</button>
         </span>
       ))}
-
       <input
         type="text"
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => addTag(input)}
-        placeholder={tags.length === 0 ? 'Add tags (press Enter)' : ''}
-        className="flex-1 min-w-[80px] text-xs outline-none bg-transparent placeholder-gray-400"
+        placeholder={tags.length === 0 ? 'Add tags...' : ''}
+        className="flex-1 min-w-[80px] text-xs bg-transparent outline-none
+                   text-[#e2e2e2] placeholder-[#444]"
       />
     </div>
   )

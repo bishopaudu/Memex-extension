@@ -3,8 +3,14 @@ import { useAuth } from '../hooks/useAuth'
 import { bookmarksApi, tagsApi, collectionsApi } from '../lib/api'
 import { BookmarkCard } from '../components/BookmarkCard'
 import { Sidebar }      from '../components/Sidebar'
+import { ThemeToggle }  from '../components/ThemeToggle'
 
-export function DashboardPage() {
+interface Props {
+  theme:       'dark' | 'light'
+  toggleTheme: () => void
+}
+
+export function DashboardPage({ theme, toggleTheme }: Props) {
   const { auth, logout } = useAuth()
 
   const [bookmarks,   setBookmarks]   = useState<any[]>([])
@@ -151,6 +157,8 @@ export function DashboardPage() {
               </svg>
             </button>
           </div>
+
+          <ThemeToggle theme={theme} toggle={toggleTheme} />
         </header>
 
         {/* Content */}
