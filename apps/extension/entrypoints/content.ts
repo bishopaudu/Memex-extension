@@ -2,8 +2,8 @@ export default defineContentScript({
   matches: ['<all_urls>'],
 
   main() {
-    // ── Page metadata extraction ──
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+
       if (message.type === 'GET_PAGE_METADATA') {
         sendResponse({
           title:       document.title,
@@ -15,80 +15,95 @@ export default defineContentScript({
         return true
       }
 
-      // ── Area selection mode ──
       if (message.type === 'START_AREA_SELECT') {
         startAreaSelector()
           .then(region => sendResponse({ region }))
           .catch(() => sendResponse({ region: null }))
-        return true // keep channel open for async response
+        return true
       }
     })
   },
 })
 
 // ─────────────────────────────────────────────
-// AREA SELECTOR
-// Injects a full-screen overlay the user drags
-// to select a region. Returns { x, y, w, h }
-// as percentages of the viewport.
+// Area selector overlay
 // ─────────────────────────────────────────────
 function startAreaSelector(): Promise<{
   x: number; y: number; w: number; h: number
 } | null> {
   return new Promise((resolve) => {
-    // Overlay covers the whole page
+    // Remove any existing overlay first
+    document.getElementById('__memex_selector__')?.remove()
+
     const overlay = document.createElement('div')
     overlay.id = '__memex_selector__'
 
     Object.assign(overlay.style, {
-      position:        'fixed',
-      inset:           '0',
-      zIndex:          '2147483647',
-      cursor:          'crosshair',
-      background:      'rgba(0, 0, 0, 0.35)',
-      backdropFilter:  'blur(1px)',
-      userSelect:      'none',
+      position:       'fixed',
+      inset:          '0',
+      zIndex:         '2147483647',
+      cursor:         'crosshair',
+      background:     'rgba(0,0,0,0.4)',
+      userSelect:     'none',
     })
 
-    // Selection box — the blue rectangle the user draws
+    // Selection rectangle
     const box = document.createElement('div')
     Object.assign(box.style, {
-      position:     'absolute',
-      border:       '2px solid #4f6ef7',
-      background:   'rgba(79, 110, 247, 0.1)',
-      borderRadius: '4px',
-      display:      'none',
+      position:      'absolute',
+      border:        '2px solid #4f6ef7',
+      background:    'rgba(79,110,247,0.12)',
+      borderRadius:  '2px',
+      display:       'none',
       pointerEvents: 'none',
+      boxShadow:     '0 0 0 9999px rgba(0,0,0,0.3)',
     })
     overlay.appendChild(box)
 
-    // Instruction label
+    // Dimensions label — shows w×h as user drags
+    const label = document.createElement('div')
+    Object.assign(label.style, {
+      position:      'absolute',
+      background:    '#4f6ef7',
+      color:         '#fff',
+      fontSize:      '11px',
+      padding:       '2px 6px',
+      borderRadius:  '4px',
+      pointerEvents: 'none',
+      display:       'none',
+      fontFamily:    'monospace',
+    })
+    overlay.appendChild(label)
+
+    // Hint bar at top
     const hint = document.createElement('div')
-    hint.textContent = 'Drag to select an area • Press Esc to cancel'
+    hint.textContent = 'Drag to select an area  •  Esc to cancel'
     Object.assign(hint.style, {
-      position:        'fixed',
-      top:             '16px',
-      left:            '50%',
-      transform:       'translateX(-50%)',
-      background:      '#111',
-      color:           '#e2e2e2',
-      fontSize:        '12px',
-      padding:         '6px 14px',
-      borderRadius:    '20px',
-      border:          '1px solid #333',
-      pointerEvents:   'none',
-      whiteSpace:      'nowrap',
+      position:    'fixed',
+      top:         '16px',
+      left:        '50%',
+      transform:   'translateX(-50%)',
+      background:  '#111',
+      color:       '#e2e2e2',
+      fontSize:    '12px',
+      padding:     '7px 16px',
+      borderRadius: '20px',
+      border:      '1px solid #333',
+      pointerEvents: 'none',
+      whiteSpace:  'nowrap',
+      zIndex:      '2147483647',
+      fontFamily:  '-apple-system, sans-serif',
     })
     overlay.appendChild(hint)
 
     document.body.appendChild(overlay)
 
-    let startX = 0, startY = 0
-    let isDragging = false
+    let startX = 0, startY = 0, dragging = false
 
     function onMouseDown(e: MouseEvent) {
       e.preventDefault()
-      isDragging = true
+      e.stopPropagation()
+      dragging = true
       startX = e.clientX
       startY = e.clientY
 
@@ -96,13 +111,14 @@ function startAreaSelector(): Promise<{
         display: 'block',
         left:    `${startX}px`,
         top:     `${startY}px`,
-        width:   '0px',
-        height:  '0px',
+        width:   '0',
+        height:  '0',
       })
+      label.style.display = 'block'
     }
 
     function onMouseMove(e: MouseEvent) {
-      if (!isDragging) return
+      if (!dragging) return
 
       const x = Math.min(e.clientX, startX)
       const y = Math.min(e.clientY, startY)
@@ -115,19 +131,23 @@ function startAreaSelector(): Promise<{
         width:  `${w}px`,
         height: `${h}px`,
       })
+
+      // Show dimensions
+      label.textContent = `${w} × ${h}`
+      Object.assign(label.style, {
+        left: `${x}px`,
+        top:  `${Math.max(0, y - 22)}px`,
+      })
     }
 
     function cleanup() {
-      overlay.removeEventListener('mousedown', onMouseDown)
-      overlay.removeEventListener('mousemove', onMouseMove)
-      overlay.removeEventListener('mouseup',   onMouseUp)
-      document.removeEventListener('keydown',  onKeyDown)
       overlay.remove()
+      document.removeEventListener('keydown', onKeyDown)
     }
 
     function onMouseUp(e: MouseEvent) {
-      if (!isDragging) return
-      isDragging = false
+      if (!dragging) return
+      dragging = false
 
       const x = Math.min(e.clientX, startX)
       const y = Math.min(e.clientY, startY)
@@ -136,22 +156,17 @@ function startAreaSelector(): Promise<{
 
       cleanup()
 
-      // Minimum selection size — ignore accidental clicks
+      // Ignore tiny accidental clicks
       if (w < 20 || h < 20) {
         resolve(null)
         return
       }
 
-      // Convert to percentages of viewport
-      // This makes the coordinates device-pixel-ratio independent
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-
       resolve({
-        x: x / vw,
-        y: y / vh,
-        w: w / vw,
-        h: h / vh,
+        x: x / window.innerWidth,
+        y: y / window.innerHeight,
+        w: w / window.innerWidth,
+        h: h / window.innerHeight,
       })
     }
 
@@ -162,16 +177,13 @@ function startAreaSelector(): Promise<{
       }
     }
 
-    overlay.addEventListener('mousedown', onMouseDown)
-    overlay.addEventListener('mousemove', onMouseMove)
-    overlay.addEventListener('mouseup',   onMouseUp)
-    document.addEventListener('keydown',  onKeyDown)
+    overlay.addEventListener('mousedown',  onMouseDown)
+    overlay.addEventListener('mousemove',  onMouseMove)
+    overlay.addEventListener('mouseup',    onMouseUp)
+    document.addEventListener('keydown',   onKeyDown)
   })
 }
 
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
 function getMeta(name: string): string | null {
   const el =
     document.querySelector(`meta[property="${name}"]`) ??

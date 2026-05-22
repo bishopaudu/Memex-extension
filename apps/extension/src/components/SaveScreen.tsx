@@ -1,28 +1,25 @@
 import { useState, useEffect } from 'react'
 import { bookmarksApi, attachmentsApi } from '../lib/api'
-import { uploadApi } from '../lib/api'
 import { TagInput } from './TagInput'
 import { cropImage } from '../lib/crop'
 
 const DASHBOARD_URL = 'http://localhost:5173'
 
 interface PageInfo {
-  url: string; title: string; description: string
-  faviconUrl: string; ogImageUrl: string
+  url: string; title: string
+  description: string; faviconUrl: string; ogImageUrl: string
 }
 
 interface Attachment {
   id:       string
   type:     'screenshot' | 'area_screenshot' | 'text'
-  content?: string   // for text notes
-  preview?: string   // base64 preview for images
+  content?: string
+  preview?: string
   status:   'pending' | 'uploading' | 'done' | 'error'
 }
 
-// The confirmation state after area selection
 interface AreaPreview {
-  dataUrl: string   // the cropped image
-  status:  'confirming' | 'adding'
+  dataUrl: string
 }
 
 interface Props {
@@ -41,12 +38,48 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const [attachments,  setAttachments]  = useState<Attachment[]>([])
   const [addingText,   setAddingText]   = useState(false)
   const [textInput,    setTextInput]    = useState('')
-
-  // Area screenshot states
+  const [areaPreview,  setAreaPreview]  = useState<AreaPreview | null>(null)
   const [selectingArea, setSelectingArea] = useState(false)
-  const [areaPreview,   setAreaPreview]   = useState<AreaPreview | null>(null)
 
-  useEffect(() => { getCurrentTabInfo() }, [])
+  useEffect(() => {
+    getCurrentTabInfo()
+    checkPendingAreaScreenshot()  // check if background captured something
+  }, [])
+
+  // ─────────────────────────────────────────────
+  // Check if background worker stored a pending
+  // area screenshot while popup was closed
+  // ─────────────────────────────────────────────
+  async function checkPendingAreaScreenshot() {
+    const result = await chrome.storage.local.get('pendingAreaScreenshot')
+    const pending = result.pendingAreaScreenshot
+
+    if (!pending) return
+
+    // Stale — ignore if older than 60 seconds
+    if (Date.now() - pending.timestamp > 60_000) {
+      await chrome.storage.local.remove('pendingAreaScreenshot')
+      return
+    }
+
+    // Crop the image to the selected region
+    try {
+      const cropped = await cropImage(pending.fullDataUrl, pending.region)
+      setAreaPreview({ dataUrl: cropped })
+
+      // Clear from storage so it doesn't show again
+      await chrome.storage.local.remove('pendingAreaScreenshot')
+
+      // Clear the badge
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (tab?.id) {
+        chrome.action.setBadgeText({ text: '', tabId: tab.id })
+      }
+    } catch (err) {
+      console.error('Failed to process pending screenshot:', err)
+      await chrome.storage.local.remove('pendingAreaScreenshot')
+    }
+  }
 
   async function getCurrentTabInfo() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -66,11 +99,11 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         setPageInfo({ ...base, ...meta })
         setTitle(meta.title || tab.title || '')
       }
-    } catch { /* use base info */ }
+    } catch { /* use base */ }
   }
 
   // ─────────────────────────────────────────────
-  // FULL SCREENSHOT
+  // FULL SCREENSHOT — captured in popup directly
   // ─────────────────────────────────────────────
   async function addFullScreenshot() {
     try {
@@ -78,10 +111,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         undefined, { format: 'png', quality: 90 }
       )
       setAttachments(prev => [...prev, {
-        id:      crypto.randomUUID(),
-        type:    'screenshot',
-        preview: dataUrl,
-        status:  'pending',
+        id: crypto.randomUUID(), type: 'screenshot',
+        preview: dataUrl, status: 'pending',
       }])
     } catch (err) {
       console.error('Screenshot failed:', err)
@@ -89,45 +120,31 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   }
 
   // ─────────────────────────────────────────────
-  // AREA SCREENSHOT — Step 1: trigger selection
+  // AREA SCREENSHOT — hands off to background SW
+  // Background survives popup close
   // ─────────────────────────────────────────────
   async function startAreaSelect() {
-    setSelectingArea(true)
-    setAreaPreview(null)
-
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (!tab?.id) { setSelectingArea(false); return }
+    if (!tab?.id) return
 
-    try {
-      // Content script shows the drag overlay
-      // Returns the selected region as percentages
-      const { region } = await chrome.tabs.sendMessage(tab.id, {
-        type: 'START_AREA_SELECT'
-      })
+    setSelectingArea(true)
 
-      if (!region) {
-        // User pressed Escape or selection too small
-        setSelectingArea(false)
-        return
-      }
+    // Tell background SW to handle the selection
+    // This fires and the popup will close — that's OK
+    // Background keeps running and stores the result
+    // User clicks extension icon again → popup reads from storage
+    chrome.runtime.sendMessage({
+      type:  'START_AREA_SELECT_BG',
+      tabId: tab.id,
+    })
 
-      // Capture full screenshot then crop to region
-      const fullDataUrl = await chrome.tabs.captureVisibleTab(
-        undefined, { format: 'png', quality: 90 }
-      )
-      const croppedDataUrl = await cropImage(fullDataUrl, region)
-
-      // Show confirmation preview — don't add to queue yet
-      setAreaPreview({ dataUrl: croppedDataUrl, status: 'confirming' })
-    } catch (err) {
-      console.error('Area select failed:', err)
-    }
-
-    setSelectingArea(false)
+    // Show instruction then close popup
+    // User needs to interact with the page
+    setTimeout(() => window.close(), 400)
   }
 
   // ─────────────────────────────────────────────
-  // AREA SCREENSHOT — Step 2: user confirms
+  // AREA PREVIEW ACTIONS
   // ─────────────────────────────────────────────
   function confirmAreaScreenshot() {
     if (!areaPreview) return
@@ -140,14 +157,12 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     setAreaPreview(null)
   }
 
-  // User wants to try selecting a different area
-  function retryAreaSelect() {
+  async function retryAreaSelect() {
     setAreaPreview(null)
-    startAreaSelect()
+    await startAreaSelect()
   }
 
-  // User cancels the preview
-  function cancelAreaPreview() {
+  function discardAreaPreview() {
     setAreaPreview(null)
   }
 
@@ -195,8 +210,6 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
     const bookmarkId = result.data.bookmark.id
     setSaveState('saved')
-
-    // Upload attachments in background
     uploadAttachments(bookmarkId)
   }
 
@@ -205,14 +218,12 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
       setAttachments(prev =>
         prev.map(a => a.id === att.id ? { ...a, status: 'uploading' } : a)
       )
-
       try {
         if (att.type === 'text' && att.content) {
           await attachmentsApi.createText(bookmarkId, att.content)
         } else if (att.preview) {
           await attachmentsApi.createAreaScreenshot(bookmarkId, att.preview)
         }
-
         setAttachments(prev =>
           prev.map(a => a.id === att.id ? { ...a, status: 'done' } : a)
         )
@@ -239,7 +250,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     )
   }
 
-  // ── Saved state ──
+  // ── Saved ──
   if (saveState === 'saved') {
     const uploading = attachments.filter(a => a.status === 'uploading').length
     const done      = attachments.filter(a => a.status === 'done').length
@@ -263,13 +274,12 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                 <p className="text-[10px] text-[#666]">
                   {uploading > 0
                     ? `Uploading ${uploading} attachment${uploading > 1 ? 's' : ''}...`
-                    : `${done} attachment${done > 1 ? 's' : ''} uploaded`}
+                    : `${done} attachment${done > 1 ? 's' : ''} attached`}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Upload progress per attachment */}
           {attachments.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {attachments.map(att => (
@@ -278,33 +288,30 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                                 border border-[#1e1e1e] rounded-lg">
                   {att.type !== 'text' && att.preview ? (
                     <img src={att.preview} alt=""
-                         className="w-8 h-8 object-cover rounded border border-[#252525]
-                                    flex-shrink-0" />
+                         className="w-8 h-8 object-cover rounded border
+                                    border-[#252525] flex-shrink-0" />
                   ) : (
                     <div className="w-8 h-8 bg-[#161616] rounded flex items-center
-                                    justify-center flex-shrink-0 text-sm">��</div>
+                                    justify-center text-sm flex-shrink-0">📝</div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-[#ccc] truncate">
-                      {att.type === 'text'
-                        ? att.content?.slice(0, 35) + '...'
-                        : att.type === 'area_screenshot'
-                          ? 'Area screenshot'
-                          : 'Full screenshot'}
-                    </p>
-                  </div>
+                  <p className="text-[10px] text-[#ccc] truncate flex-1">
+                    {att.type === 'text'
+                      ? att.content?.slice(0, 40)
+                      : att.type === 'area_screenshot'
+                        ? 'Area screenshot' : 'Full screenshot'}
+                  </p>
                   {att.status === 'uploading' && (
-                    <div className="w-3 h-3 border-2 border-[#4f6ef7] border-t-transparent
-                                    rounded-full animate-spin flex-shrink-0" />
+                    <div className="w-3 h-3 border-2 border-[#4f6ef7]
+                                    border-t-transparent rounded-full animate-spin" />
                   )}
                   {att.status === 'done' && (
-                    <svg className="w-3 h-3 text-green-400 flex-shrink-0" fill="none"
+                    <svg className="w-3 h-3 text-green-400" fill="none"
                          viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
                     </svg>
                   )}
                   {att.status === 'error' && (
-                    <span className="text-[10px] text-red-400 flex-shrink-0">failed</span>
+                    <span className="text-[10px] text-red-400">failed</span>
                   )}
                 </div>
               ))}
@@ -318,13 +325,6 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                        text-[#999] hover:border-[#4f6ef7] hover:text-[#7b93ff]
                        transition-colors"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor" strokeWidth={2}>
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-            </svg>
             Open dashboard
           </button>
         </div>
@@ -336,7 +336,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     <div className="flex flex-col h-full bg-[#0d0d0d]">
       <Header userEmail={userEmail} onLogout={onLogout} />
 
-      {/* Page preview strip */}
+      {/* Page strip */}
       <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#111]
                       border-b border-[#1e1e1e]">
         {pageInfo.faviconUrl && (
@@ -351,7 +351,6 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
       <div className="flex-1 flex flex-col gap-3 px-4 py-3 overflow-y-auto">
 
-        {/* Title */}
         <div>
           <label className="text-[10px] font-medium text-[#555] uppercase
                             tracking-wider mb-1.5 block">Title</label>
@@ -359,50 +358,46 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            disabled={saveState === 'saving'}
             className="w-full px-3 py-2 bg-[#161616] border border-[#252525]
                        rounded-lg text-sm text-[#e2e2e2] outline-none
-                       focus:border-[#4f6ef7] transition-colors disabled:opacity-40"
+                       focus:border-[#4f6ef7] transition-colors"
           />
         </div>
 
-        {/* Tags */}
         <div>
           <label className="text-[10px] font-medium text-[#555] uppercase
                             tracking-wider mb-1.5 block">Tags</label>
           <TagInput tags={tags} onChange={setTags} />
         </div>
 
-        {/* ── ATTACHMENTS ── */}
+        {/* Attachments */}
         <div>
           <label className="text-[10px] font-medium text-[#555] uppercase
                             tracking-wider mb-1.5 block">
             Attachments
             {attachments.length > 0 && (
-              <span className="ml-1.5 text-[#4f6ef7] normal-case">
+              <span className="ml-1.5 text-[#4f6ef7] normal-case font-normal">
                 ({attachments.length})
               </span>
             )}
           </label>
 
-          {/* ── AREA PREVIEW — shown after selection ── */}
+          {/* ── AREA PREVIEW ── */}
           {areaPreview && (
-            <div className="mb-3 border border-[#4f6ef7]/40 rounded-xl overflow-hidden
-                            bg-[#111]">
-              {/* Preview image */}
+            <div className="mb-3 rounded-xl overflow-hidden border
+                            border-[#4f6ef7]/40 bg-[#111]">
               <img
                 src={areaPreview.dataUrl}
-                alt="Selected area"
-                className="w-full object-contain max-h-32"
+                alt="Selected area preview"
+                className="w-full object-contain max-h-36"
               />
-
-              {/* Confirmation bar */}
-              <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#1e1e1e]">
+              <div className="flex items-center gap-2 px-3 py-2.5
+                              border-t border-[#1e1e1e]">
                 <span className="text-[10px] text-[#666] flex-1">
-                  Area selected — looks good?
+                  Area selected
                 </span>
                 <button
-                  onClick={cancelAreaPreview}
+                  onClick={discardAreaPreview}
                   className="text-[10px] text-[#555] hover:text-[#999]
                              transition-colors px-2 py-1"
                 >
@@ -410,15 +405,17 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                 </button>
                 <button
                   onClick={retryAreaSelect}
-                  className="text-[10px] text-[#666] hover:text-[#ccc] transition-colors
-                             px-2 py-1 border border-[#252525] rounded"
+                  className="text-[10px] text-[#777] hover:text-[#ccc]
+                             transition-colors px-2 py-1 border border-[#333]
+                             rounded"
                 >
                   Retry
                 </button>
                 <button
                   onClick={confirmAreaScreenshot}
-                  className="text-[10px] text-white bg-[#4f6ef7] hover:bg-[#3b5bf5]
-                             transition-colors px-3 py-1 rounded font-medium"
+                  className="text-[10px] text-white bg-[#4f6ef7]
+                             hover:bg-[#3b5bf5] transition-colors px-3
+                             py-1 rounded font-medium"
                 >
                   Add ✓
                 </button>
@@ -426,8 +423,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </div>
           )}
 
-          {/* Existing attachment queue */}
-          {attachments.length > 0 && (
+          {/* Existing attachments */}
+          {attachments.length > 0 && !areaPreview && (
             <div className="flex flex-col gap-1.5 mb-2">
               {attachments.map(att => (
                 <div key={att.id}
@@ -435,19 +432,18 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                                 border border-[#1e1e1e] rounded-lg group">
                   {att.type !== 'text' && att.preview ? (
                     <img src={att.preview} alt=""
-                         className="w-10 h-10 object-cover rounded flex-shrink-0
-                                    border border-[#252525]" />
+                         className="w-10 h-10 object-cover rounded
+                                    border border-[#252525] flex-shrink-0" />
                   ) : (
                     <div className="w-10 h-10 bg-[#161616] rounded flex items-center
-                                    justify-center flex-shrink-0 text-base">📝</div>
+                                    justify-center text-base flex-shrink-0">📝</div>
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] text-[#ccc] truncate">
                       {att.type === 'text'
                         ? att.content?.slice(0, 40)
                         : att.type === 'area_screenshot'
-                          ? 'Area screenshot'
-                          : 'Full screenshot'}
+                          ? 'Area screenshot' : 'Full screenshot'}
                     </p>
                     <p className="text-[9px] text-[#444] capitalize">
                       {att.type.replace('_', ' ')}
@@ -455,9 +451,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                   </div>
                   <button
                     onClick={() => removeAttachment(att.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity
-                               text-[#444] hover:text-red-400 p-1 flex-shrink-0"
-                    title="Remove"
+                    className="opacity-0 group-hover:opacity-100 text-[#444]
+                               hover:text-red-400 p-1 transition-all"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
                          stroke="currentColor" strokeWidth={2}>
@@ -470,7 +465,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </div>
           )}
 
-          {/* Text note composer */}
+          {/* Text composer */}
           {addingText && (
             <div className="mb-2">
               <textarea
@@ -480,8 +475,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                 onKeyDown={e => {
                   if (e.key === 'Enter' && e.metaKey) addTextNote()
                   if (e.key === 'Escape') {
-                    setAddingText(false)
-                    setTextInput('')
+                    setAddingText(false); setTextInput('')
                   }
                 }}
                 placeholder="Type a note, quote, or thought..."
@@ -503,8 +497,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                   onClick={addTextNote}
                   disabled={!textInput.trim()}
                   className="text-[10px] text-white bg-[#4f6ef7] hover:bg-[#3b5bf5]
-                             disabled:opacity-40 transition-colors px-3 py-1
-                             rounded font-medium"
+                             disabled:opacity-40 px-3 py-1 rounded font-medium
+                             transition-colors"
                 >
                   Add note
                 </button>
@@ -512,26 +506,18 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </div>
           )}
 
-          {/* Add attachment buttons — hidden while area preview is showing */}
+          {/* Action buttons — hidden when preview or text composer is open */}
           {!addingText && !areaPreview && (
             <div className="grid grid-cols-3 gap-1.5">
+              <AttachButton emoji="📸" label="Screenshot" onClick={addFullScreenshot} />
               <AttachButton
-                emoji="📸"
-                label="Screenshot"
-                onClick={addFullScreenshot}
-              />
-              <AttachButton
-                emoji={selectingArea ? '⏳' : '✂️'}
-                label={selectingArea ? 'Selecting...' : 'Select area'}
+                emoji="✂️"
+                label="Select area"
                 onClick={startAreaSelect}
                 disabled={selectingArea}
-                active={selectingArea}
+                hint="Popup closes while you select"
               />
-              <AttachButton
-                emoji="📝"
-                label="Text note"
-                onClick={() => setAddingText(true)}
-              />
+              <AttachButton emoji="📝" label="Text note" onClick={() => setAddingText(true)} />
             </div>
           )}
         </div>
@@ -543,8 +529,13 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         )}
       </div>
 
-      {/* Save button */}
+      {/* Footer */}
       <div className="px-4 pb-4 pt-2 border-t border-[#1e1e1e]">
+        {areaPreview && (
+          <p className="text-[10px] text-[#555] text-center mb-2">
+            Confirm or discard the selection above first
+          </p>
+        )}
         <button
           onClick={handleSave}
           disabled={saveState === 'saving' || !!areaPreview}
@@ -573,51 +564,35 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </>
           )}
         </button>
-
-        {areaPreview && (
-          <p className="text-center text-[10px] text-[#444] mt-2">
-            Confirm or discard the area selection first
-          </p>
-        )}
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────
-// Small reusable attach button
-// ─────────────────────────────────────────────
 function AttachButton({
-  emoji, label, onClick, disabled, active
+  emoji, label, onClick, disabled, hint
 }: {
   emoji:    string
   label:    string
   onClick:  () => void
   disabled?: boolean
-  active?:   boolean
+  hint?:     string
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center gap-1 p-2.5 rounded-lg
-                  border transition-all disabled:opacity-40
-                  ${active
-                    ? 'bg-[#1a1f3a] border-[#4f6ef7]/40 text-[#7b93ff]'
-                    : 'bg-[#111] border-[#1e1e1e] hover:border-[#252525] hover:bg-[#161616]'
-                  }`}
+      title={hint}
+      className="flex flex-col items-center gap-1 p-2.5 rounded-lg border
+                 bg-[#111] border-[#1e1e1e] hover:border-[#252525]
+                 hover:bg-[#161616] transition-all disabled:opacity-40"
     >
       <span className="text-base leading-none">{emoji}</span>
-      <span className={`text-[9px] ${active ? 'text-[#7b93ff]' : 'text-[#666]'}`}>
-        {label}
-      </span>
+      <span className="text-[9px] text-[#666]">{label}</span>
     </button>
   )
 }
 
-// ─────────────────────────────────────────────
-// Header
-// ─────────────────────────────────────────────
 function Header({ userEmail, onLogout }: { userEmail: string; onLogout: () => void }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e1e1e]">
