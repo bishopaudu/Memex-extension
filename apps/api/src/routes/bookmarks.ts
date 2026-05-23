@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { db, bookmarks, tags, bookmarkTags } from '../db'
+import { db, bookmarks, tags, bookmarkTags, attachments } from '../db'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
 import { generateTags, generateSummary, enhanceSearchQuery } from '../lib/ai'
@@ -12,8 +12,6 @@ const bookmarksRouter = new Hono<{
 
 bookmarksRouter.use('*', authMiddleware)
 
-// Helper — converts empty strings to null for optional URL fields
-// This is a real-world pattern: browser APIs often return "" not undefined
 const optionalUrl = z.string()
   .transform(v => v === '' ? null : v)
   .nullable()
@@ -41,17 +39,18 @@ const updateBookmarkSchema = z.object({
 // GET /bookmarks
 // ─────────────────────────────────────────────
 bookmarksRouter.get('/', async (c) => {
-  const userId  = c.get('userId')
-  let   search  = c.req.query('search') ?? ''
-  const tagName = c.req.query('tag')    ?? ''
-  const page    = parseInt(c.req.query('page')  ?? '1')
-  const limit   = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
-  const offset  = (page - 1) * limit
+  const userId       = c.get('userId')
+  let   search       = c.req.query('search') ?? ''
+  const tagFilter    = c.req.query('tag')    ?? ''
+  const page         = parseInt(c.req.query('page')  ?? '1')
+  const limit        = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
+  const offset       = (page - 1) * limit
 
   if (search.length > 10 && search.includes(' ')) {
     search = await enhanceSearchQuery(search)
   }
 
+  // Step 1: fetch bookmarks with tags
   const results = await db.query.bookmarks.findMany({
     where: and(
       eq(bookmarks.userId, userId),
@@ -64,11 +63,38 @@ bookmarksRouter.get('/', async (c) => {
           ) @@ plainto_tsquery('english', ${search})`
         : undefined,
     ),
-    with: { bookmarkTags: { with: { tag: true } } },
+    with: {
+      bookmarkTags: { with: { tag: true } },
+    },
     orderBy: [desc(bookmarks.createdAt)],
     limit,
     offset,
   })
+
+  if (results.length === 0) {
+    return c.json({ data: { items: [], page, limit }, error: null })
+  }
+
+  // Step 2: fetch attachments separately for all bookmarks
+  // This is more reliable than relying on Drizzle relations
+  const bookmarkIds = results.map(b => b.id)
+
+  const allAttachments = await db
+    .select()
+    .from(attachments)
+    .where(
+      sql`${attachments.bookmarkId} = ANY(ARRAY[${sql.join(
+        bookmarkIds.map(id => sql`${id}::uuid`),
+        sql`, `
+      )}])`
+    )
+
+  // Group attachments by bookmarkId for fast lookup
+  const attachmentsByBookmark = allAttachments.reduce((acc, att) => {
+    if (!acc[att.bookmarkId]) acc[att.bookmarkId] = []
+    acc[att.bookmarkId].push(att)
+    return acc
+  }, {} as Record<string, typeof allAttachments>)
 
   const items = results.map(b => ({
     id:            b.id,
@@ -80,6 +106,7 @@ bookmarksRouter.get('/', async (c) => {
     ogImageUrl:    b.ogImageUrl,
     isArchived:    b.isArchived,
     tags:          b.bookmarkTags.map(bt => bt.tag),
+    attachments:   attachmentsByBookmark[b.id] ?? [],
     createdAt:     b.createdAt,
     updatedAt:     b.updatedAt,
   }))
@@ -94,9 +121,6 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
   const userId = c.get('userId')
   const input  = c.req.valid('json')
 
-  // Run AI enrichment — fully non-fatal
-  // If Gemini key missing or call fails, we get empty arrays back
-  // and the bookmark saves normally without AI features
   const [aiTags, aiSummary] = await Promise.all([
     generateTags({
       url:         input.url,
@@ -110,14 +134,9 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
     }),
   ])
 
-  const userTags = input.tags ?? []
-  const allTags  = [...new Set([...userTags, ...aiTags])]
-
-  const finalDescription = input.description || aiSummary || null
-
-  if (aiTags.length > 0) {
-    console.log(`[AI] Tags: ${aiTags.join(', ')}`)
-  }
+  const userTags       = input.tags ?? []
+  const allTags        = [...new Set([...userTags, ...aiTags])]
+  const finalDesc      = input.description || aiSummary || null
 
   const bookmark = await db.transaction(async (tx) => {
     const [newBookmark] = await tx
@@ -126,7 +145,7 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
         userId,
         url:           input.url,
         title:         input.title         ?? null,
-        description:   finalDescription,
+        description:   finalDesc,
         faviconUrl:    input.faviconUrl    ?? null,
         ogImageUrl:    input.ogImageUrl    ?? null,
         screenshotUrl: input.screenshotUrl ?? null,
@@ -135,7 +154,7 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
       .returning()
 
     for (const tagName of allTags) {
-      const clean = tagName.toLowerCase().trim().replace(/[^a-z0-9-\s]/g, '')
+      const clean = tagName.toLowerCase().trim().replace(/[^a-z0-9\-\s]/g, '')
       if (!clean) continue
 
       const [tag] = await tx
@@ -145,7 +164,6 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
         .returning({ id: tags.id })
 
       let tagId = tag?.id
-
       if (!tagId) {
         const [existing] = await tx
           .select({ id: tags.id })
@@ -170,7 +188,7 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
 })
 
 // ─────────────────────────────────────────────
-// GET /bookmarks/:id
+// GET /bookmarks/:id  — includes attachments
 // ─────────────────────────────────────────────
 bookmarksRouter.get('/:id', async (c) => {
   const userId = c.get('userId')
@@ -188,9 +206,19 @@ bookmarksRouter.get('/:id', async (c) => {
     }, 404)
   }
 
+  // Fetch attachments separately — always reliable
+  const bookmarkAttachments = await db
+    .select()
+    .from(attachments)
+    .where(eq(attachments.bookmarkId, id))
+
   return c.json({
     data: {
-      bookmark: { ...bookmark, tags: bookmark.bookmarkTags.map(bt => bt.tag) }
+      bookmark: {
+        ...bookmark,
+        tags:        bookmark.bookmarkTags.map(bt => bt.tag),
+        attachments: bookmarkAttachments,
+      }
     },
     error: null,
   })
@@ -242,7 +270,6 @@ bookmarksRouter.patch('/:id', zValidator('json', updateBookmarkSchema), async (c
           .returning({ id: tags.id })
 
         let tagId = tag?.id
-
         if (!tagId) {
           const [ex] = await tx
             .select({ id: tags.id })

@@ -58,6 +58,10 @@ export const bookmarksApi = {
     const qs = q.toString()
     return apiFetch<{ items: any[]; page: number; limit: number }>(`/api/bookmarks${qs ? `?${qs}` : ''}`)
   },
+  async getOne(id: string) {
+    return apiFetch<{ bookmark: any }>(`/api/bookmarks/${id}`)
+  },
+
   async delete(id: string) {
     return apiFetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
   },

@@ -95,3 +95,9 @@ export const attachmentsApi = {
     })
   },
 }
+
+export const tagsApi = {
+  async list() {
+    return apiFetch<{ items: { id: string; name: string; count: number }[] }>('/api/tags')
+  },
+}
