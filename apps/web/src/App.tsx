@@ -24,22 +24,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const authValue = useAuthProvider()
+  const authValue  = useAuthProvider()
   const themeValue = useTheme()
 
   return (
     <AuthContext.Provider value={authValue}>
       <Routes>
-        <Route path="/auth" element={<AuthPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />} />
         <Route
-          path="/"
+          path="/auth"
+          element={<AuthPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />}
+        />
+        <Route
+          path="/*"
           element={
             <ProtectedRoute>
               <DashboardPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthContext.Provider>
   )

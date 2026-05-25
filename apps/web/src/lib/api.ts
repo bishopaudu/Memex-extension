@@ -81,6 +81,10 @@ export const collectionsApi = {
       method: 'POST', body: JSON.stringify(input),
     })
   },
+  async getOne(id: string) {
+    return apiFetch<{ collection: any }>(`/api/collections/${id}`)
+  },
+
   async delete(id: string) {
     return apiFetch(`/api/collections/${id}`, { method: 'DELETE' })
   },

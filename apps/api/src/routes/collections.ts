@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { db, collections, bookmarkCollections, bookmarks } from '../db'
-import { eq, and, desc, sql } from 'drizzle-orm'
+import { db, collections, bookmarkCollections, bookmarks, bookmarkTags, tags, attachments } from '../db'
+import { eq, and, desc, sql, inArray } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
 
 const collectionsRouter = new Hono<{
@@ -70,7 +70,7 @@ collectionsRouter.post('/', zValidator('json', createCollectionSchema), async (c
 
 // ─────────────────────────────────────────────
 // GET /collections/:id
-// Returns collection with its bookmarks
+// Returns collection with full bookmarks + attachments
 // ─────────────────────────────────────────────
 collectionsRouter.get('/:id', async (c) => {
   const userId = c.get('userId')
@@ -78,15 +78,6 @@ collectionsRouter.get('/:id', async (c) => {
 
   const collection = await db.query.collections.findFirst({
     where: and(eq(collections.id, id), eq(collections.userId, userId)),
-    with: {
-      bookmarkCollections: {
-        with: {
-          bookmark: {
-            with: { bookmarkTags: { with: { tag: true } } }
-          }
-        }
-      }
-    }
   })
 
   if (!collection) {
@@ -96,21 +87,64 @@ collectionsRouter.get('/:id', async (c) => {
     }, 404)
   }
 
-  const bookmarkItems = collection.bookmarkCollections.map(bc => ({
-    ...bc.bookmark,
-    tags: bc.bookmark.bookmarkTags.map(bt => bt.tag),
+  // Get bookmark IDs in this collection
+  const bcRows = await db
+    .select({ bookmarkId: bookmarkCollections.bookmarkId })
+    .from(bookmarkCollections)
+    .where(eq(bookmarkCollections.collectionId, id))
+
+  const bookmarkIds = bcRows.map(r => r.bookmarkId)
+
+  if (bookmarkIds.length === 0) {
+    return c.json({
+      data: {
+        collection: {
+          ...collection,
+          bookmarks: [],
+        }
+      },
+      error: null,
+    })
+  }
+
+  // Fetch full bookmarks with tags
+  const bookmarkRows = await db.query.bookmarks.findMany({
+    where: inArray(bookmarks.id, bookmarkIds),
+    with: { bookmarkTags: { with: { tag: true } } },
+  })
+
+  // Fetch attachments for all bookmarks
+  const allAttachments = await db
+    .select()
+    .from(attachments)
+    .where(inArray(attachments.bookmarkId, bookmarkIds))
+
+  const attsByBookmark = allAttachments.reduce((acc, att) => {
+    if (!acc[att.bookmarkId]) acc[att.bookmarkId] = []
+    acc[att.bookmarkId].push(att)
+    return acc
+  }, {} as Record<string, typeof allAttachments>)
+
+  const bookmarkItems = bookmarkRows.map(b => ({
+    id:            b.id,
+    url:           b.url,
+    title:         b.title,
+    description:   b.description,
+    screenshotUrl: b.screenshotUrl,
+    faviconUrl:    b.faviconUrl,
+    ogImageUrl:    b.ogImageUrl,
+    isArchived:    b.isArchived,
+    tags:          b.bookmarkTags.map(bt => bt.tag),
+    attachments:   attsByBookmark[b.id] ?? [],
+    createdAt:     b.createdAt,
+    updatedAt:     b.updatedAt,
   }))
 
   return c.json({
     data: {
       collection: {
-        id:          collection.id,
-        name:        collection.name,
-        description: collection.description,
-        color:       collection.color,
-        icon:        collection.icon,
-        isPublic:    collection.isPublic,
-        bookmarks:   bookmarkItems,
+        ...collection,
+        bookmarks: bookmarkItems,
       }
     },
     error: null,

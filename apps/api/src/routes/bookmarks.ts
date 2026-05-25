@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { db, bookmarks, tags, bookmarkTags, attachments } from '../db'
+import { db, bookmarks, tags, bookmarkTags, attachments, bookmarkCollections } from '../db'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
 import { generateTags, generateSummary, enhanceSearchQuery } from '../lib/ai'
@@ -46,8 +46,25 @@ bookmarksRouter.get('/', async (c) => {
   const limit        = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
   const offset       = (page - 1) * limit
 
+  const collectionId = c.req.query('collectionId') ?? ''
+
   if (search.length > 10 && search.includes(' ')) {
     search = await enhanceSearchQuery(search)
+  }
+
+  // If filtering by collection, get bookmark IDs first
+  let collectionBookmarkIds: string[] = []
+  if (collectionId) {
+    const rows = await db
+      .select({ bookmarkId: bookmarkCollections.bookmarkId })
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.collectionId, collectionId))
+    collectionBookmarkIds = rows.map(r => r.bookmarkId)
+
+    // No bookmarks in collection — return early
+    if (collectionBookmarkIds.length === 0) {
+      return c.json({ data: { items: [], page, limit }, error: null })
+    }
   }
 
   // Step 1: fetch bookmarks with tags
@@ -55,6 +72,9 @@ bookmarksRouter.get('/', async (c) => {
     where: and(
       eq(bookmarks.userId, userId),
       eq(bookmarks.isArchived, false),
+      collectionId && collectionBookmarkIds.length > 0
+        ? inArray(bookmarks.id, collectionBookmarkIds)
+        : undefined,
       search
         ? sql`to_tsvector('english',
             coalesce(${bookmarks.title}, '') || ' ' ||

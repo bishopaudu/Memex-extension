@@ -10,9 +10,12 @@ interface Props {
   activeTag:     string
   activeCollection: string
   bookmarkCount: number
+  currentPage:   'home' | 'collections'
   onTagClick:       (tag: string) => void
   onCollectionClick: (id: string) => void
   onCollectionsChange: () => void
+  onOpenCollectionsPage: () => void
+  onGoHome: () => void
   userEmail: string
   onLogout: () => void
 }
@@ -21,8 +24,9 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
-  bookmarkCount, onTagClick, onCollectionClick,
-  onCollectionsChange, userEmail, onLogout
+  bookmarkCount, currentPage, onTagClick, onCollectionClick,
+  onCollectionsChange, onOpenCollectionsPage, onGoHome,
+  userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
   const [newName,    setNewName]    = useState('')
@@ -73,6 +77,24 @@ export function Sidebar({
             All bookmarks
             <span className="ml-auto text-[10px] bg-surface-3 text-ink-4 px-1.5 py-0.5 rounded">
               {bookmarkCount}
+            </span>
+          </button>
+
+          <button
+            onClick={onOpenCollectionsPage}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs
+                        transition-colors text-left
+                        ${currentPage === 'collections'
+                          ? 'bg-brand/10 text-brand-bright'
+                          : 'text-ink-3 hover:text-ink-2 hover:bg-surface-3'}`}
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" strokeWidth={2}>
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+            </svg>
+            Collections
+            <span className="ml-auto text-[10px] bg-surface-3 text-ink-4 px-1.5 py-0.5 rounded">
+              {collections.length}
             </span>
           </button>
         </div>
