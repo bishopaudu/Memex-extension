@@ -154,3 +154,12 @@ export const topicsApi = {
     })
   },
 }
+
+export const graphApi = {
+  async getTopicGraph() {
+    return apiFetch<{
+      nodes: { id: string; title: string; emoji: string; coverColor: string; refCount: number; linkCount: number }[]
+      edges: { source: string; target: string; label: string | null }[]
+    }>('/api/topics/graph')
+  },
+}

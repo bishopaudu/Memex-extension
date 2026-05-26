@@ -204,3 +204,60 @@ function getFavicon(): string {
   }
   return `${window.location.origin}/favicon.ico`
 }
+
+// The context menu item is created in background.ts
+// Content script handles the actual text extraction
+// and sends it to background when user selects highlight
+
+// Listen for highlight save request from background
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'GET_SELECTED_TEXT') {
+    const selection = window.getSelection()
+    const text      = selection?.toString().trim() ?? ''
+    const range     = selection?.getRangeAt(0)
+
+    // Get surrounding context (sentence before/after)
+    let context = ''
+    if (range) {
+      const container = range.commonAncestorContainer
+      const parent    = container.nodeType === 3
+        ? container.parentElement
+        : container as Element
+      context = parent?.textContent?.slice(0, 300) ?? ''
+    }
+
+    sendResponse({
+      text,
+      context,
+      url:   window.location.href,
+      title: document.title,
+    })
+    return true
+  }
+})
+
+// Listen for extract page request
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'EXTRACT_PAGE_CONTENT') {
+    try {
+      // Clone the document so Readability doesn't modify the live page
+      const documentClone = document.cloneNode(true) as Document
+      const { Readability } = require('@mozilla/readability')
+      const reader  = new Readability(documentClone)
+      const article = reader.parse()
+
+      sendResponse({
+        title:       article?.title   ?? document.title,
+        content:     article?.textContent?.slice(0, 5000) ?? '',
+        excerpt:     article?.excerpt ?? '',
+        byline:      article?.byline  ?? '',
+        siteName:    article?.siteName ?? '',
+        length:      article?.length  ?? 0,
+        readingTime: article ? Math.ceil(article.length / 1000) : 0,
+      })
+    } catch (err) {
+      sendResponse({ error: 'Could not extract content' })
+    }
+    return true
+  }
+})

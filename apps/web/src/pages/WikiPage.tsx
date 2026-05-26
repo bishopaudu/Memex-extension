@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TopicGraph } from '../components/TopicGraph'
 import { topicsApi } from '../lib/api'
 
 interface Topic {
@@ -14,6 +15,7 @@ interface Topic {
 
 interface Props {
   topics:         Topic[]
+  theme:          'dark' | 'light'
   onOpenTopic:    (id: string) => void
   onTopicsChange: () => void
 }
@@ -25,8 +27,9 @@ const COVER_COLORS = [
 
 const DEFAULT_EMOJIS = ['📄','🧠','💡','🔬','🎯','⚡','🌐','📊','🏗️','🎨','🚀','📚']
 
-export function WikiPage({ topics, onOpenTopic, onTopicsChange }: Props) {
+export function WikiPage({ topics, theme, onOpenTopic, onTopicsChange }: Props) {
   const [creating,   setCreating]   = useState(false)
+  const [showGraph,  setShowGraph]  = useState(false)
   const [newTitle,   setNewTitle]   = useState('')
   const [newEmoji,   setNewEmoji]   = useState('📄')
   const [newColor,   setNewColor]   = useState(COVER_COLORS[0])

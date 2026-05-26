@@ -36,12 +36,17 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const [attachments,   setAttachments]   = useState<Attachment[]>([])
   const [addingText,    setAddingText]    = useState(false)
   const [textInput,     setTextInput]     = useState('')
-  const [selectingArea, setSelectingArea] = useState(false)
+  const [selectingArea,  setSelectingArea]  = useState(false)
+  const [extracting,       setExtracting]       = useState(false)
+  const [pendingHighlight, setPendingHighlight] = useState<{
+    text: string; context: string; url: string; title: string
+  } | null>(null)
   const [areaPreview,   setAreaPreview]   = useState<AreaPreview | null>(null)
 
   useEffect(() => {
     getCurrentTabInfo()
     checkPendingAreaScreenshot()
+    checkPendingHighlight()
   }, [])
 
   async function checkPendingAreaScreenshot() {
@@ -61,6 +66,28 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     } catch {
       await chrome.storage.local.remove('pendingAreaScreenshot')
     }
+  }
+
+  async function checkPendingHighlight() {
+    const result = await chrome.storage.local.get('pendingHighlight')
+    const pending = result.pendingHighlight
+    if (!pending) return
+    if (Date.now() - pending.timestamp > 60_000) {
+      await chrome.storage.local.remove('pendingHighlight')
+      return
+    }
+    setPendingHighlight(pending)
+    // Pre-add as text attachment
+    setAttachments(prev => [...prev, {
+      id:      crypto.randomUUID(),
+      type:    'text',
+      content: `"${pending.text}"`,
+      status:  'pending',
+    }])
+    await chrome.storage.local.remove('pendingHighlight')
+    // Clear badge
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id })
   }
 
   async function getCurrentTabInfo() {
@@ -108,6 +135,32 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   }
 
   function retryAreaSelect() { setAreaPreview(null); startAreaSelect() }
+
+  async function extractPageContent() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) return
+    setExtracting(true)
+    try {
+      const result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_PAGE_CONTENT' })
+      if (result?.content) {
+        // Add as a text attachment with the extracted content
+        const summary = result.excerpt || result.content.slice(0, 300)
+        setAttachments(prev => [...prev, {
+          id:      crypto.randomUUID(),
+          type:    'text' as const,
+          content: `📄 Extracted content\n\n${summary}${result.content.length > 300 ? '...' : ''}`,
+          status:  'pending' as const,
+        }])
+        // Also update description if empty
+        if (pageInfo && !pageInfo.description && result.excerpt) {
+          setPageInfo(prev => prev ? { ...prev, description: result.excerpt } : prev)
+        }
+      }
+    } catch (err) {
+      console.error('Extraction failed:', err)
+    }
+    setExtracting(false)
+  }
 
   function addTextNote() {
     if (!textInput.trim()) return
@@ -451,7 +504,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
           {/* Attachment buttons */}
           {!addingText && !areaPreview && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <AttachBtn emoji="📸" label="Screenshot" onClick={addFullScreenshot} />
               <AttachBtn
                 emoji="✂️"
@@ -462,6 +515,13 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
               />
               <AttachBtn emoji="📝" label="Text note"
                          onClick={() => setAddingText(true)} />
+              <AttachBtn
+                emoji={extracting ? '⏳' : '📰'}
+                label={extracting ? 'Extracting...' : 'Extract page'}
+                onClick={extractPageContent}
+                disabled={extracting}
+                hint="Extract readable text from this page"
+              />
             </div>
           )}
         </div>

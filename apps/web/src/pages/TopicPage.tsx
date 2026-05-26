@@ -3,7 +3,7 @@ import { topicsApi, bookmarksApi } from '../lib/api'
 
 interface Block {
   id:       string
-  type:     'heading1' | 'heading2' | 'heading3' | 'paragraph' | 'bullet' | 'code' | 'quote' | 'divider'
+  type:     'heading1' | 'heading2' | 'heading3' | 'paragraph' | 'bullet' | 'code' | 'quote' | 'divider' | 'bookmark_embed'
   content:  string
   metadata?: string
   order:    string
@@ -52,14 +52,15 @@ interface Props {
 }
 
 const BLOCK_TYPES = [
-  { type: 'heading1',   icon: 'H1', label: 'Heading 1' },
-  { type: 'heading2',   icon: 'H2', label: 'Heading 2' },
-  { type: 'heading3',   icon: 'H3', label: 'Heading 3' },
-  { type: 'paragraph',  icon: '¶',  label: 'Paragraph' },
-  { type: 'bullet',     icon: '•',  label: 'Bullet' },
-  { type: 'code',       icon: '<>', label: 'Code' },
-  { type: 'quote',      icon: '"',  label: 'Quote' },
-  { type: 'divider',    icon: '—',  label: 'Divider' },
+  { type: 'heading1',       icon: 'H1', label: 'Heading 1' },
+  { type: 'heading2',       icon: 'H2', label: 'Heading 2' },
+  { type: 'heading3',       icon: 'H3', label: 'Heading 3' },
+  { type: 'paragraph',      icon: '¶',  label: 'Paragraph' },
+  { type: 'bullet',         icon: '•',  label: 'Bullet' },
+  { type: 'code',           icon: '<>', label: 'Code' },
+  { type: 'quote',          icon: '"',  label: 'Quote' },
+  { type: 'divider',        icon: '—',  label: 'Divider' },
+  { type: 'bookmark_embed', icon: '🔗', label: 'Bookmark embed' },
 ]
 
 export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
@@ -97,6 +98,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
     const r = await bookmarksApi.list()
     if (!r.error) setAllBookmarks(r.data.items)
   }
+
 
   // Auto-save blocks 1.5s after last change
   const scheduleAutoSave = useCallback((newBlocks: Block[]) => {
@@ -313,20 +315,30 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
             {/* ── BLOCK EDITOR ── */}
             <div className="mt-6 flex flex-col gap-0.5">
               {blocks.map((block, idx) => (
-                <BlockEditor
-                  key={block.id}
-                  block={block}
-                  isActive={activeBlock === block.id}
-                  showMenu={blockMenu === block.id}
-                  onFocus={() => setActiveBlock(block.id)}
-                  onBlur={() => setActiveBlock(null)}
-                  onUpdate={content => updateBlock(block.id, content)}
-                  onEnter={() => addBlock(block.id)}
-                  onDelete={() => deleteBlock(block.id)}
-                  onMenuToggle={() => setBlockMenu(prev => prev === block.id ? null : block.id)}
-                  onChangeType={type => changeBlockType(block.id, type as Block['type'])}
-                  onAddBelow={type => addBlock(block.id, type as Block['type'])}
-                />
+                block.type === 'bookmark_embed' ? (
+                  <BookmarkEmbedBlock
+                    key={block.id}
+                    block={block}
+                    allBookmarks={allBookmarks}
+                    onSelect={(bookmarkId) => updateBlock(block.id, bookmarkId)}
+                    onDelete={() => deleteBlock(block.id)}
+                  />
+                ) : (
+                  <BlockEditor
+                    key={block.id}
+                    block={block}
+                    isActive={activeBlock === block.id}
+                    showMenu={blockMenu === block.id}
+                    onFocus={() => setActiveBlock(block.id)}
+                    onBlur={() => setActiveBlock(null)}
+                    onUpdate={content => updateBlock(block.id, content)}
+                    onEnter={() => addBlock(block.id)}
+                    onDelete={() => deleteBlock(block.id)}
+                    onMenuToggle={() => setBlockMenu(prev => prev === block.id ? null : block.id)}
+                    onChangeType={type => changeBlockType(block.id, type as Block['type'])}
+                    onAddBelow={type => addBlock(block.id, type as Block['type'])}
+                  />
+                )
               ))}
 
               {/* Add block button */}
@@ -500,6 +512,132 @@ function SummaryInput({ value, onChange }: { value: string; onChange: (v: string
 // ─────────────────────────────────────────────
 // Block Editor — single block
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Bookmark Embed Block
+// ─────────────────────────────────────────────
+function BookmarkEmbedBlock({ block, allBookmarks, onSelect, onDelete }: {
+  block:        Block
+  allBookmarks: any[]
+  onSelect:     (bookmarkId: string) => void
+  onDelete:     () => void
+}) {
+  const [showSearch, setShowSearch] = useState(false)
+  const [query,      setQuery]      = useState('')
+
+  // block.content stores the bookmarkId once selected
+  const selectedBookmark = block.content
+    ? allBookmarks.find(b => b.id === block.content)
+    : null
+
+  const filtered = allBookmarks.filter(b =>
+    (b.title ?? b.url).toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 6)
+
+  if (selectedBookmark) {
+    let domain = ''
+    try { domain = new URL(selectedBookmark.url).hostname.replace('www.', '') } catch {}
+
+    return (
+      <div className="group my-1 relative">
+        
+          <a href={selectedBookmark.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 p-3 bg-surface-3 border border-surface-4
+                     rounded-xl hover:border-brand/30 transition-colors"
+        >
+          {selectedBookmark.faviconUrl && (
+            <div className="w-8 h-8 bg-surface-2 rounded-lg border border-surface-4
+                            flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src={selectedBookmark.faviconUrl} alt=""
+                   className="w-5 h-5 object-contain"
+                   onError={e => (e.currentTarget.style.display = 'none')} />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-ink-1 truncate">
+              {selectedBookmark.title ?? domain}
+            </p>
+            <p className="text-[10px] text-ink-4 truncate">{selectedBookmark.url}</p>
+            {selectedBookmark.description && (
+              <p className="text-[10px] text-ink-3 line-clamp-1 mt-0.5">
+                {selectedBookmark.description}
+              </p>
+            )}
+          </div>
+          <svg className="w-3.5 h-3.5 text-ink-5 flex-shrink-0" fill="none"
+               viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+        <button
+          onClick={onDelete}
+          className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center
+                     rounded-full bg-surface-2 border border-surface-4 text-ink-4
+                     hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+               stroke="currentColor" strokeWidth={2}>
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
+  // No bookmark selected yet — show search
+  return (
+    <div className="my-1 border border-dashed border-surface-5 rounded-xl p-3">
+      <p className="text-[11px] text-ink-4 mb-2 flex items-center gap-1.5">
+        <span>🔗</span> Select a bookmark to embed
+      </p>
+      <input
+        autoFocus
+        type="text"
+        placeholder="Search your bookmarks..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        className="w-full px-3 py-1.5 bg-surface-3 border border-surface-4 rounded-lg
+                   text-xs text-ink-1 placeholder-ink-4 outline-none focus:border-brand
+                   transition-colors mb-2"
+      />
+      <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+        {filtered.map(b => {
+          let domain = ''
+          try { domain = new URL(b.url).hostname.replace('www.', '') } catch {}
+          return (
+            <button
+              key={b.id}
+              onClick={() => {
+                // Update block content with bookmarkId
+                onSelect(b.id)
+              }}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left
+                         hover:bg-surface-3 transition-colors"
+            >
+              {b.faviconUrl && (
+                <img src={b.faviconUrl} alt="" className="w-3.5 h-3.5 flex-shrink-0"
+                     onError={e => (e.currentTarget.style.display = 'none')} />
+              )}
+              <p className="text-[11px] text-ink-2 truncate">{b.title ?? domain}</p>
+            </button>
+          )
+        })}
+        {filtered.length === 0 && query && (
+          <p className="text-[10px] text-ink-5 text-center py-2">No bookmarks found</p>
+        )}
+      </div>
+      <button onClick={onDelete}
+              className="mt-2 text-[10px] text-ink-5 hover:text-ink-3 transition-colors">
+        Cancel
+      </button>
+    </div>
+  )
+}
+
 function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
                        onEnter, onDelete, onMenuToggle, onChangeType, onAddBelow }: {
   block:          Block
@@ -527,7 +665,7 @@ function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
     )
   }
 
-  const textClass = {
+  const classes: Record<string, string> = {
     heading1:  'text-2xl font-bold text-ink-1',
     heading2:  'text-xl font-semibold text-ink-1',
     heading3:  'text-base font-semibold text-ink-2',
@@ -535,7 +673,8 @@ function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
     bullet:    'text-sm text-ink-1 leading-relaxed',
     code:      'text-xs text-green-400 font-mono bg-surface-3 rounded px-3 py-2',
     quote:     'text-sm text-ink-2 italic border-l-2 border-brand/40 pl-3',
-  }[block.type] ?? 'text-sm text-ink-1'
+  }
+  const textClass = classes[block.type] ?? 'text-sm text-ink-1'
 
   return (
     <div className="group relative flex items-start gap-1">

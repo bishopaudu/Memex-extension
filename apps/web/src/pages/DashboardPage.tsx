@@ -152,6 +152,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
       {page.type === 'wiki' && (
         <WikiPage
           topics={topics}
+          theme={theme}
           onOpenTopic={id => setPage({ type: 'topic', topicId: id })}
           onTopicsChange={fetchTopics}
         />

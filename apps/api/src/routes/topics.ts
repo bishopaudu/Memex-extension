@@ -322,3 +322,41 @@ topicsRouter.delete('/:id/connections/:toTopicId', async (c) => {
 })
 
 export default topicsRouter
+
+// ─────────────────────────────────────────────
+// GET /topics/graph — all topics + connections
+// for graph visualization
+// ─────────────────────────────────────────────
+topicsRouter.get('/graph', async (c) => {
+  const userId = c.get('userId')
+
+  const allTopics = await db.query.topics.findMany({
+    where: eq(topics.userId, userId),
+    with: {
+      references:  true,
+      connections: true,
+    },
+  })
+
+  const nodes = allTopics.map(t => ({
+    id:         t.id,
+    title:      t.title,
+    emoji:      t.emoji,
+    coverColor: t.coverColor,
+    refCount:   t.references.length,
+    linkCount:  t.connections.length,
+  }))
+
+  const edges: { source: string; target: string; label: string | null }[] = []
+  for (const topic of allTopics) {
+    for (const conn of topic.connections) {
+      edges.push({
+        source: topic.id,
+        target: conn.toTopicId,
+        label:  conn.label,
+      })
+    }
+  }
+
+  return c.json({ data: { nodes, edges }, error: null })
+})
