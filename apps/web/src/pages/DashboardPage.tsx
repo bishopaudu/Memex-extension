@@ -6,6 +6,7 @@ import { BookmarkModalLoader }    from '../components/BookmarkModalLoader'
 import { Sidebar }                from '../components/Sidebar'
 import { ThemeToggle }            from '../components/ThemeToggle'
 import { CollectionsPage }        from './CollectionsPage'
+import { SearchModal }             from '../components/SearchModal'
 import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
 import { TopicPage }               from './TopicPage'
@@ -36,6 +37,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const [view,             setView]             = useState<'grid' | 'list'>('grid')
   const [topics,           setTopics]           = useState<any[]>([])
   const [selectedId,       setSelectedId]       = useState<string | null>(null)
+  const [showSearch,       setShowSearch]       = useState(false)
   const [debouncedSearch,  setDebouncedSearch]  = useState('')
 
   useEffect(() => {
@@ -48,6 +50,18 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   }, [debouncedSearch, activeTag, activeCollection, page])
 
   useEffect(() => { fetchTags(); fetchCollections(); fetchTopics() }, [])
+
+  // Global Cmd+K to open search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   async function fetchBookmarks() {
     setLoading(true)
@@ -308,6 +322,14 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
             )}
           </main>
         </div>
+      )}
+
+      {showSearch && (
+        <SearchModal
+          onClose={() => setShowSearch(false)}
+          onOpenBookmark={id => { setSelectedId(id); setShowSearch(false) }}
+          onOpenTopic={id => { setPage({ type: 'topic', topicId: id }); setShowSearch(false) }}
+        />
       )}
 
       {selectedId && (
