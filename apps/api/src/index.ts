@@ -8,6 +8,7 @@ import bookmarksRouter   from './routes/bookmarks'
 import tagsRouter        from './routes/tags'
 import uploadRouter      from './routes/upload'
 import collectionsRouter from './routes/collections'
+import topicsRouter      from './routes/topics'
 import attachmentsRouter from './routes/attachments'
 
 const app = new Hono()
@@ -32,6 +33,7 @@ app.route('/api/bookmarks',   bookmarksRouter)
 app.route('/api/tags',        tagsRouter)
 app.route('/api/upload',      uploadRouter)
 app.route('/api/collections', collectionsRouter)
+app.route('/api/topics',      topicsRouter)
 app.route('/api/attachments', attachmentsRouter)
 
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))

@@ -1,7 +1,7 @@
 import { defineConfig } from 'wxt'
 
 export default defineConfig({
-  framework: 'react',
+ // framework: 'react',
   manifest: {
     name: 'Memex — Visual Bookmarks',
     description: 'Save anything from the web. Find it instantly.',

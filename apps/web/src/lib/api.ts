@@ -99,3 +99,64 @@ export const collectionsApi = {
     })
   },
 }
+
+export const topicsApi = {
+  async list() {
+    return apiFetch<{ items: any[] }>('/api/topics')
+  },
+
+  async create(input: { title: string; emoji?: string; summary?: string; coverColor?: string }) {
+    return apiFetch<{ topic: any }>('/api/topics', {
+      method: 'POST',
+      body:   JSON.stringify(input),
+    })
+  },
+
+  async getOne(id: string) {
+    return apiFetch<{ topic: any }>(`/api/topics/${id}`)
+  },
+
+  async update(id: string, input: Partial<{ title: string; emoji: string; summary: string; coverColor: string; isPublic: boolean }>) {
+    return apiFetch(`/api/topics/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(input),
+    })
+  },
+
+  async delete(id: string) {
+    return apiFetch(`/api/topics/${id}`, { method: 'DELETE' })
+  },
+
+  async saveBlocks(id: string, blocks: any[]) {
+    return apiFetch(`/api/topics/${id}/blocks`, {
+      method: 'PUT',
+      body:   JSON.stringify({ blocks }),
+    })
+  },
+
+  async addReference(topicId: string, bookmarkId: string, note?: string) {
+    return apiFetch(`/api/topics/${topicId}/references`, {
+      method: 'POST',
+      body:   JSON.stringify({ bookmarkId, note }),
+    })
+  },
+
+  async removeReference(topicId: string, bookmarkId: string) {
+    return apiFetch(`/api/topics/${topicId}/references/${bookmarkId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  async connect(fromId: string, toId: string, label?: string) {
+    return apiFetch(`/api/topics/${fromId}/connections`, {
+      method: 'POST',
+      body:   JSON.stringify({ toTopicId: toId, label }),
+    })
+  },
+
+  async disconnect(fromId: string, toId: string) {
+    return apiFetch(`/api/topics/${fromId}/connections/${toId}`, {
+      method: 'DELETE',
+    })
+  },
+}

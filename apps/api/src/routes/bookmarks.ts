@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db, bookmarks, tags, bookmarkTags, attachments, bookmarkCollections } from '../db'
-import { eq, and, desc, sql } from 'drizzle-orm'
+import { eq, and, desc, sql, inArray } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
 import { generateTags, generateSummary, enhanceSearchQuery } from '../lib/ai'
 

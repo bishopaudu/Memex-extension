@@ -7,6 +7,8 @@ import { Sidebar }                from '../components/Sidebar'
 import { ThemeToggle }            from '../components/ThemeToggle'
 import { CollectionsPage }        from './CollectionsPage'
 import { CollectionDetailPage }   from './CollectionDetailPage'
+import { WikiPage }                from './WikiPage'
+import { TopicPage }               from './TopicPage'
 
 interface Props {
   theme:       'dark' | 'light'
@@ -17,6 +19,8 @@ type Page =
   | { type: 'home' }
   | { type: 'collections' }
   | { type: 'collection-detail'; collectionId: string }
+  | { type: 'wiki' }
+  | { type: 'topic'; topicId: string }
 
 export function DashboardPage({ theme, toggleTheme }: Props) {
   const { auth, logout } = useAuth()
@@ -30,6 +34,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const [activeCollection, setActiveCollection] = useState('')
   const [loading,          setLoading]          = useState(true)
   const [view,             setView]             = useState<'grid' | 'list'>('grid')
+  const [topics,           setTopics]           = useState<any[]>([])
   const [selectedId,       setSelectedId]       = useState<string | null>(null)
   const [debouncedSearch,  setDebouncedSearch]  = useState('')
 
@@ -42,7 +47,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
     if (page.type === 'home') fetchBookmarks()
   }, [debouncedSearch, activeTag, activeCollection, page])
 
-  useEffect(() => { fetchTags(); fetchCollections() }, [])
+  useEffect(() => { fetchTags(); fetchCollections(); fetchTopics() }, [])
 
   async function fetchBookmarks() {
     setLoading(true)
@@ -58,6 +63,12 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   async function fetchTags() {
     const r = await tagsApi.list()
     if (!r.error) setTags(r.data.items)
+  }
+
+  async function fetchTopics() {
+    const { topicsApi } = await import('../lib/api')
+    const r = await topicsApi.list()
+    if (!r.error) setTopics(r.data.items)
   }
 
   async function fetchCollections() {
@@ -86,8 +97,9 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const user = auth.status === 'authenticated' ? auth.user : null
 
   // Sidebar current page indicator
-  const sidebarPage = page.type === 'collections' || page.type === 'collection-detail'
-    ? 'collections'
+  const sidebarPage =
+    page.type === 'collections' || page.type === 'collection-detail' ? 'collections'
+    : page.type === 'wiki' || page.type === 'topic' ? 'wiki'
     : 'home'
 
   return (
@@ -103,6 +115,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
         onCollectionClick={handleCollectionClick}
         onCollectionsChange={fetchCollections}
         onOpenCollectionsPage={() => setPage({ type: 'collections' })}
+        onOpenWikiPage={() => setPage({ type: 'wiki' })}
         onGoHome={() => {
           setPage({ type: 'home' })
           setActiveCollection('')
@@ -118,6 +131,30 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
           collections={collections}
           onOpenCollection={id => setPage({ type: 'collection-detail', collectionId: id })}
           onCollectionsChange={fetchCollections}
+        />
+      )}
+
+      {/* ── WIKI PAGE ── */}
+      {page.type === 'wiki' && (
+        <WikiPage
+          topics={topics}
+          onOpenTopic={id => setPage({ type: 'topic', topicId: id })}
+          onTopicsChange={fetchTopics}
+        />
+      )}
+
+      {/* ── TOPIC DETAIL ── */}
+      {page.type === 'topic' && (
+        <TopicPage
+          topicId={page.topicId}
+          allTopics={topics}
+          onBack={() => setPage({ type: 'wiki' })}
+          onDelete={async (id) => {
+            const { topicsApi } = await import('../lib/api')
+            await topicsApi.delete(id)
+            fetchTopics()
+            setPage({ type: 'wiki' })
+          }}
         />
       )}
 

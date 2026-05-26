@@ -160,3 +160,85 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
   bookmark: one(bookmarks, { fields: [attachments.bookmarkId], references: [bookmarks.id] }),
   user:     one(users,     { fields: [attachments.userId],     references: [users.id] }),
 }))
+
+// ─────────────────────────────────────────────
+// TOPICS (wiki pages)
+// ─────────────────────────────────────────────
+export const topics = pgTable('topics', {
+  id:          uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title:       text('title').notNull(),
+  emoji:       text('emoji').default('📄'),
+  summary:     text('summary'),           // short 1-2 sentence description
+  isPublic:    boolean('is_public').default(false),
+  coverColor:  text('cover_color').default('#4f6ef7'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ─────────────────────────────────────────────
+// TOPIC BLOCKS (rich content inside a topic)
+// Block types: heading | paragraph | bullet |
+//              code | quote | image | divider | bookmark_embed
+// ─────────────────────────────────────────────
+export const topicBlocks = pgTable('topic_blocks', {
+  id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  topicId:    uuid('topic_id').notNull().references(() => topics.id, { onDelete: 'cascade' }),
+  type:       text('type').notNull(),     // heading|paragraph|bullet|code|quote|image|divider|bookmark_embed
+  content:    text('content'),            // text content for text blocks
+  metadata:   text('metadata'),           // JSON: { level: 1 } for headings, { language: 'js' } for code
+  order:      text('order').notNull(),    // fractional indexing for drag-to-reorder
+  createdAt:  timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ─────────────────────────────────────────────
+// TOPIC REFERENCES (bookmarks attached to a topic)
+// ─────────────────────────────────────────────
+export const topicReferences = pgTable('topic_references', {
+ // id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  topicId:    uuid('topic_id').notNull().references(() => topics.id, { onDelete: 'cascade' }),
+  bookmarkId: uuid('bookmark_id').notNull().references(() => bookmarks.id, { onDelete: 'cascade' }),
+  note:       text('note'),               // why this reference is relevant
+  addedAt:    timestamp('added_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.topicId, table.bookmarkId] }),
+}))
+
+// ─────────────────────────────────────────────
+// TOPIC CONNECTIONS (links between topics)
+// ─────────────────────────────────────────────
+export const topicConnections = pgTable('topic_connections', {
+  //id:          uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  fromTopicId: uuid('from_topic_id').notNull().references(() => topics.id, { onDelete: 'cascade' }),
+  toTopicId:   uuid('to_topic_id').notNull().references(() => topics.id, { onDelete: 'cascade' }),
+  label:       text('label'),             // optional relationship label "leads to", "part of"
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.fromTopicId, table.toTopicId] }),
+}))
+
+// ─────────────────────────────────────────────
+// RELATIONS
+// ─────────────────────────────────────────────
+export const topicsRelations = relations(topics, ({ one, many }) => ({
+  user:        one(users,   { fields: [topics.userId], references: [users.id] }),
+  blocks:      many(topicBlocks),
+  references:  many(topicReferences),
+  connections: many(topicConnections, { relationName: 'fromTopic' }),
+  backlinks:   many(topicConnections, { relationName: 'toTopic' }),
+}))
+
+export const topicBlocksRelations = relations(topicBlocks, ({ one }) => ({
+  topic: one(topics, { fields: [topicBlocks.topicId], references: [topics.id] }),
+}))
+
+export const topicReferencesRelations = relations(topicReferences, ({ one }) => ({
+  topic:    one(topics,    { fields: [topicReferences.topicId],    references: [topics.id] }),
+  bookmark: one(bookmarks, { fields: [topicReferences.bookmarkId], references: [bookmarks.id] }),
+}))
+
+export const topicConnectionsRelations = relations(topicConnections, ({ one }) => ({
+  fromTopic: one(topics, { fields: [topicConnections.fromTopicId], references: [topics.id], relationName: 'fromTopic' }),
+  toTopic:   one(topics, { fields: [topicConnections.toTopicId],   references: [topics.id], relationName: 'toTopic' }),
+}))

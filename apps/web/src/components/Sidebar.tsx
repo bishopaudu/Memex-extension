@@ -10,11 +10,12 @@ interface Props {
   activeTag:     string
   activeCollection: string
   bookmarkCount: number
-  currentPage:   'home' | 'collections'
+  currentPage:   'home' | 'collections' | 'wiki'
   onTagClick:       (tag: string) => void
   onCollectionClick: (id: string) => void
   onCollectionsChange: () => void
   onOpenCollectionsPage: () => void
+  onOpenWikiPage: () => void
   onGoHome: () => void
   userEmail: string
   onLogout: () => void
@@ -25,7 +26,7 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
   bookmarkCount, currentPage, onTagClick, onCollectionClick,
-  onCollectionsChange, onOpenCollectionsPage, onGoHome,
+  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onGoHome,
   userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
@@ -96,6 +97,18 @@ export function Sidebar({
             <span className="ml-auto text-[10px] bg-surface-3 text-ink-4 px-1.5 py-0.5 rounded">
               {collections.length}
             </span>
+          </button>
+
+          <button
+            onClick={onOpenWikiPage}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs
+                        transition-colors text-left
+                        ${currentPage === 'wiki'
+                          ? 'bg-brand/10 text-brand-bright'
+                          : 'text-ink-3 hover:text-ink-2 hover:bg-surface-3'}`}
+          >
+            <span className="text-sm leading-none">🧠</span>
+            Wiki
           </button>
         </div>
 
