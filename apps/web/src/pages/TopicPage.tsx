@@ -174,7 +174,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
 
   async function connectTopic(toId: string) {
     await topicsApi.connect(topicId, toId)
-    setShowConnect(false)
+    // Don't close panel — user can keep adding connections
     fetchTopic()
   }
 
@@ -409,10 +409,12 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
               </p>
               <button
                 onClick={() => setShowConnect(!showConnect)}
-                className="text-[10px] text-brand-bright hover:underline"
-                disabled={connectableTopics.length === 0}
+                className={`text-[10px] transition-colors
+                            ${showConnect
+                              ? 'text-ink-3 hover:text-ink-1'
+                              : 'text-brand-bright hover:underline'}`}
               >
-                + Link
+                {showConnect ? 'Done' : '+ Link'}
               </button>
             </div>
 
