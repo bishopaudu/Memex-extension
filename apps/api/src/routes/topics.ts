@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { db, topics, topicBlocks, topicReferences, topicConnections, bookmarks, bookmarkTags, tags, attachments } from '../db'
-import { eq, and, desc, inArray } from 'drizzle-orm'
+import {
+  db, topics, topicBlocks, topicReferences,
+  topicConnections, bookmarks, attachments
+} from '../db'
+import { eq, and, desc, inArray, sql } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
-import { sql } from 'drizzle-orm'
 
 const topicsRouter = new Hono<{
   Variables: { userId: string; userEmail: string }
@@ -28,16 +30,16 @@ topicsRouter.get('/', async (c) => {
   })
 
   const items = results.map(t => ({
-    id:          t.id,
-    title:       t.title,
-    emoji:       t.emoji,
-    summary:     t.summary,
-    coverColor:  t.coverColor,
-    isPublic:    t.isPublic,
-    blockCount:  t.blocks.length,
-    refCount:    t.references.length,
-    createdAt:   t.createdAt,
-    updatedAt:   t.updatedAt,
+    id:         t.id,
+    title:      t.title,
+    emoji:      t.emoji,
+    summary:    t.summary,
+    coverColor: t.coverColor,
+    isPublic:   t.isPublic,
+    blockCount: t.blocks.length,
+    refCount:   t.references.length,
+    createdAt:  t.createdAt,
+    updatedAt:  t.updatedAt,
   }))
 
   return c.json({ data: { items }, error: null })
@@ -60,7 +62,6 @@ topicsRouter.post('/', zValidator('json', z.object({
     .values({ userId, ...input })
     .returning()
 
-  // Create a default empty paragraph block
   await db.insert(topicBlocks).values({
     topicId: topic.id,
     type:    'paragraph',
@@ -69,6 +70,54 @@ topicsRouter.post('/', zValidator('json', z.object({
   })
 
   return c.json({ data: { topic }, error: null }, 201)
+})
+
+// ─────────────────────────────────────────────
+// GET /topics/graph
+// CRITICAL: must be BEFORE /:id route
+// Otherwise Hono matches "graph" as a topic ID
+// ─────────────────────────────────────────────
+topicsRouter.get('/graph', async (c) => {
+  const userId = c.get('userId')
+
+  try {
+    const allTopics = await db.query.topics.findMany({
+      where: eq(topics.userId, userId),
+      with:  { references: true },
+    })
+
+    const topicIds = allTopics.map(t => t.id)
+
+    const allConnections = topicIds.length > 0
+      ? await db
+          .select()
+          .from(topicConnections)
+          .where(inArray(topicConnections.fromTopicId, topicIds))
+      : []
+
+    const nodes = allTopics.map(t => ({
+      id:         t.id,
+      title:      t.title,
+      emoji:      t.emoji,
+      coverColor: t.coverColor ?? '#4f6ef7',
+      refCount:   t.references?.length ?? 0,
+      linkCount:  allConnections.filter(conn => conn.fromTopicId === t.id).length,
+    }))
+
+    const edges = allConnections.map(conn => ({
+      source: conn.fromTopicId,
+      target: conn.toTopicId,
+      label:  conn.label,
+    }))
+
+    return c.json({ data: { nodes, edges }, error: null })
+  } catch (err) {
+    console.error('[Graph] Error:', err)
+    return c.json({
+      data:  null,
+      error: { code: 'GRAPH_ERROR', message: 'Failed to load graph' }
+    }, 500)
+  }
 })
 
 // ─────────────────────────────────────────────
@@ -82,20 +131,29 @@ topicsRouter.get('/:id', async (c) => {
     where: and(eq(topics.id, id), eq(topics.userId, userId)),
     with: {
       blocks:      { orderBy: [topicBlocks.order] },
-      references:  { with: { bookmark: { with: { bookmarkTags: { with: { tag: true } } } } } },
+      references:  {
+        with: {
+          bookmark: { with: { bookmarkTags: { with: { tag: true } } } }
+        }
+      },
       connections: { with: { toTopic: true } },
       backlinks:   { with: { fromTopic: true } },
     },
   })
 
   if (!topic) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    return c.json({
+      data:  null,
+      error: { code: 'NOT_FOUND', message: 'Topic not found' }
+    }, 404)
   }
 
-  // Fetch attachments for referenced bookmarks
   const bookmarkIds = topic.references.map(r => r.bookmarkId)
   const allAtts = bookmarkIds.length > 0
-    ? await db.select().from(attachments).where(inArray(attachments.bookmarkId, bookmarkIds))
+    ? await db
+        .select()
+        .from(attachments)
+        .where(inArray(attachments.bookmarkId, bookmarkIds))
     : []
 
   const attsByBookmark = allAtts.reduce((acc, att) => {
@@ -158,14 +216,21 @@ topicsRouter.patch('/:id', zValidator('json', z.object({
   const id     = c.req.param('id')
   const input  = c.req.valid('json')
 
-  const [existing] = await db.select({ id: topics.id }).from(topics)
-    .where(and(eq(topics.id, id), eq(topics.userId, userId))).limit(1)
+  const [existing] = await db
+    .select({ id: topics.id })
+    .from(topics)
+    .where(and(eq(topics.id, id), eq(topics.userId, userId)))
+    .limit(1)
 
   if (!existing) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    return c.json({
+      data:  null,
+      error: { code: 'NOT_FOUND', message: 'Topic not found' }
+    }, 404)
   }
 
-  await db.update(topics)
+  await db
+    .update(topics)
     .set({ ...input, updatedAt: new Date() })
     .where(eq(topics.id, id))
 
@@ -179,12 +244,16 @@ topicsRouter.delete('/:id', async (c) => {
   const userId = c.get('userId')
   const id     = c.req.param('id')
 
-  const result = await db.delete(topics)
+  const result = await db
+    .delete(topics)
     .where(and(eq(topics.id, id), eq(topics.userId, userId)))
     .returning({ id: topics.id })
 
   if (!result.length) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    return c.json({
+      data:  null,
+      error: { code: 'NOT_FOUND', message: 'Topic not found' }
+    }, 404)
   }
 
   return c.json({ data: { success: true }, error: null })
@@ -192,7 +261,6 @@ topicsRouter.delete('/:id', async (c) => {
 
 // ─────────────────────────────────────────────
 // PUT /topics/:id/blocks — save all blocks
-// We replace all blocks on each save (simpler than diff)
 // ─────────────────────────────────────────────
 topicsRouter.put('/:id/blocks', zValidator('json', z.object({
   blocks: z.array(z.object({
@@ -203,22 +271,26 @@ topicsRouter.put('/:id/blocks', zValidator('json', z.object({
     order:    z.string(),
   }))
 })), async (c) => {
-  const userId = c.get('userId')
-  const id     = c.req.param('id')
+  const userId             = c.get('userId')
+  const id                 = c.req.param('id')
   const { blocks: newBlocks } = c.req.valid('json')
 
-  const [existing] = await db.select({ id: topics.id }).from(topics)
-    .where(and(eq(topics.id, id), eq(topics.userId, userId))).limit(1)
+  const [existing] = await db
+    .select({ id: topics.id })
+    .from(topics)
+    .where(and(eq(topics.id, id), eq(topics.userId, userId)))
+    .limit(1)
 
   if (!existing) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    return c.json({
+      data:  null,
+      error: { code: 'NOT_FOUND', message: 'Topic not found' }
+    }, 404)
   }
 
   await db.transaction(async (tx) => {
-    // Delete all existing blocks
     await tx.delete(topicBlocks).where(eq(topicBlocks.topicId, id))
 
-    // Insert new blocks
     if (newBlocks.length > 0) {
       await tx.insert(topicBlocks).values(
         newBlocks.map((b, i) => ({
@@ -232,8 +304,8 @@ topicsRouter.put('/:id/blocks', zValidator('json', z.object({
       )
     }
 
-    // Update topic updatedAt
-    await tx.update(topics)
+    await tx
+      .update(topics)
       .set({ updatedAt: new Date() })
       .where(eq(topics.id, id))
   })
@@ -242,24 +314,31 @@ topicsRouter.put('/:id/blocks', zValidator('json', z.object({
 })
 
 // ─────────────────────────────────────────────
-// POST /topics/:id/references — add bookmark
+// POST /topics/:id/references
 // ─────────────────────────────────────────────
 topicsRouter.post('/:id/references', zValidator('json', z.object({
   bookmarkId: z.string().uuid(),
   note:       z.string().optional(),
 })), async (c) => {
-  const userId     = c.get('userId')
-  const id         = c.req.param('id')
+  const userId              = c.get('userId')
+  const id                  = c.req.param('id')
   const { bookmarkId, note } = c.req.valid('json')
 
-  const [topic] = await db.select({ id: topics.id }).from(topics)
-    .where(and(eq(topics.id, id), eq(topics.userId, userId))).limit(1)
+  const [topic] = await db
+    .select({ id: topics.id })
+    .from(topics)
+    .where(and(eq(topics.id, id), eq(topics.userId, userId)))
+    .limit(1)
 
   if (!topic) {
-    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    return c.json({
+      data:  null,
+      error: { code: 'NOT_FOUND', message: 'Topic not found' }
+    }, 404)
   }
 
-  await db.insert(topicReferences)
+  await db
+    .insert(topicReferences)
     .values({ topicId: id, bookmarkId, note: note ?? null })
     .onConflictDoNothing()
 
@@ -270,11 +349,11 @@ topicsRouter.post('/:id/references', zValidator('json', z.object({
 // DELETE /topics/:id/references/:bookmarkId
 // ─────────────────────────────────────────────
 topicsRouter.delete('/:id/references/:bookmarkId', async (c) => {
-  const userId     = c.get('userId')
   const id         = c.req.param('id')
   const bookmarkId = c.req.param('bookmarkId')
 
-  await db.delete(topicReferences)
+  await db
+    .delete(topicReferences)
     .where(and(
       eq(topicReferences.topicId, id),
       eq(topicReferences.bookmarkId, bookmarkId)
@@ -284,21 +363,24 @@ topicsRouter.delete('/:id/references/:bookmarkId', async (c) => {
 })
 
 // ─────────────────────────────────────────────
-// POST /topics/:id/connections — link two topics
+// POST /topics/:id/connections
 // ─────────────────────────────────────────────
 topicsRouter.post('/:id/connections', zValidator('json', z.object({
   toTopicId: z.string().uuid(),
   label:     z.string().optional(),
 })), async (c) => {
-  const userId   = c.get('userId')
-  const id       = c.req.param('id')
+  const id                   = c.req.param('id')
   const { toTopicId, label } = c.req.valid('json')
 
   if (id === toTopicId) {
-    return c.json({ data: null, error: { code: 'INVALID', message: 'Cannot connect topic to itself' } }, 400)
+    return c.json({
+      data:  null,
+      error: { code: 'INVALID', message: 'Cannot connect topic to itself' }
+    }, 400)
   }
 
-  await db.insert(topicConnections)
+  await db
+    .insert(topicConnections)
     .values({ fromTopicId: id, toTopicId, label: label ?? null })
     .onConflictDoNothing()
 
@@ -312,7 +394,8 @@ topicsRouter.delete('/:id/connections/:toTopicId', async (c) => {
   const id        = c.req.param('id')
   const toTopicId = c.req.param('toTopicId')
 
-  await db.delete(topicConnections)
+  await db
+    .delete(topicConnections)
     .where(and(
       eq(topicConnections.fromTopicId, id),
       eq(topicConnections.toTopicId, toTopicId)
@@ -322,41 +405,3 @@ topicsRouter.delete('/:id/connections/:toTopicId', async (c) => {
 })
 
 export default topicsRouter
-
-// ─────────────────────────────────────────────
-// GET /topics/graph — all topics + connections
-// for graph visualization
-// ─────────────────────────────────────────────
-topicsRouter.get('/graph', async (c) => {
-  const userId = c.get('userId')
-
-  const allTopics = await db.query.topics.findMany({
-    where: eq(topics.userId, userId),
-    with: {
-      references:  true,
-      connections: true,
-    },
-  })
-
-  const nodes = allTopics.map(t => ({
-    id:         t.id,
-    title:      t.title,
-    emoji:      t.emoji,
-    coverColor: t.coverColor,
-    refCount:   t.references.length,
-    linkCount:  t.connections.length,
-  }))
-
-  const edges: { source: string; target: string; label: string | null }[] = []
-  for (const topic of allTopics) {
-    for (const conn of topic.connections) {
-      edges.push({
-        source: topic.id,
-        target: conn.toTopicId,
-        label:  conn.label,
-      })
-    }
-  }
-
-  return c.json({ data: { nodes, edges }, error: null })
-})
