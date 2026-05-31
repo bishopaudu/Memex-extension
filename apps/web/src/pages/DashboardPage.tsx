@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { bookmarksApi, tagsApi, collectionsApi } from '../lib/api'
 import { BookmarkCard }           from '../components/BookmarkCard'
 import { BookmarkModalLoader }    from '../components/BookmarkModalLoader'
+import { BookmarkDetailPage }     from './BookmarkDetailPage'
 import { Sidebar }                from '../components/Sidebar'
 import { ThemeToggle }            from '../components/ThemeToggle'
 import { CollectionsPage }        from './CollectionsPage'
@@ -22,6 +23,7 @@ type Page =
   | { type: 'collection-detail'; collectionId: string }
   | { type: 'wiki' }
   | { type: 'topic'; topicId: string }
+  | { type: 'bookmark-detail'; bookmarkId: string }
 
 export function DashboardPage({ theme, toggleTheme }: Props) {
   const { auth, logout } = useAuth()
@@ -301,7 +303,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                     collections={collections}
                     onDelete={handleDelete}
                     onTagClick={handleTagClick}
-                    onOpenModal={b => setSelectedId(b.id)}
+                    onOpenModal={b => setPage({ type: 'bookmark-detail', bookmarkId: b.id })}
                     onCollectionsChange={() => { fetchCollections(); fetchBookmarks() }}
                   />
                 ))}
@@ -316,7 +318,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                     bookmark={b}
                     onDelete={handleDelete}
                     onTagClick={handleTagClick}
-                    onOpenModal={b => setSelectedId(b.id)}
+                    onOpenModal={b => setPage({ type: 'bookmark-detail', bookmarkId: b.id })}
                   />
                 ))}
               </div>
@@ -330,6 +332,16 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
           onClose={() => setShowSearch(false)}
           onOpenBookmark={id => { setSelectedId(id); setShowSearch(false) }}
           onOpenTopic={id => { setPage({ type: 'topic', topicId: id }); setShowSearch(false) }}
+        />
+      )}
+
+      {/* ── BOOKMARK DETAIL PAGE ── */}
+      {page.type === 'bookmark-detail' && (
+        <BookmarkDetailPage
+          bookmarkId={page.bookmarkId}
+          onBack={() => setPage({ type: 'home' })}
+          onDelete={id => { handleDelete(id); setPage({ type: 'home' }) }}
+          onTagClick={handleTagClick}
         />
       )}
 

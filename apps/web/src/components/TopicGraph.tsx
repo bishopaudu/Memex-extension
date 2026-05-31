@@ -61,6 +61,9 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
   const [pathFrom,     setPathFrom]     = useState<string | null>(null)
   const [pathResult,   setPathResult]   = useState<PathResult | null>(null)
   const [pathMsg,      setPathMsg]      = useState<string | null>(null)
+  const [heatmap,      setHeatmap]      = useState<'none' | 'refs' | 'links'>('none')
+  const [showMinimap,  setShowMinimap]  = useState(true)
+  const minimapRef     = useRef<SVGSVGElement>(null)
 
   // Refs for D3 closures
   const modeRef        = useRef<Mode>('navigate')
@@ -112,6 +115,47 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
         !searchQ || d.title.toLowerCase().includes(searchQ.toLowerCase()) ? 1 : 0.12
       )
   }, [searchQ])
+
+  // Heatmap effect
+  useEffect(() => {
+    if (!svgRef.current || nodeCount === 0) return
+    const nodes = nodesRef.current
+    if (nodes.length === 0) return
+    const dark = theme === 'dark'
+
+    if (heatmap === 'none') {
+      d3.select(svgRef.current)
+        .selectAll<SVGCircleElement, GraphNode>('.main-circle')
+        .transition().duration(400)
+        .attr('fill', d => d.coverColor + (dark ? '25' : '20'))
+        .attr('stroke', d => d.coverColor + '80')
+      return
+    }
+
+    const getValue = (d: GraphNode) =>
+      heatmap === 'refs' ? d.refCount : d.linkCount
+
+    const values = nodes.map(getValue)
+    const max    = Math.max(1, ...values)
+    const min    = Math.min(...values)
+
+    // Simple manual color scale: high=warm red, low=cool blue
+    // Avoids D3 interpolator issues entirely
+    function heatColor(val: number): string {
+      const t = max === min ? 0 : (val - min) / (max - min) // 0=cold, 1=hot
+      if (t >= 0.8) return '#ef4444' // hot red
+      if (t >= 0.6) return '#f97316' // orange
+      if (t >= 0.4) return '#eab308' // yellow
+      if (t >= 0.2) return '#22c55e' // green
+      return '#3b82f6'               // cold blue
+    }
+
+    d3.select(svgRef.current)
+      .selectAll<SVGCircleElement, GraphNode>('.main-circle')
+      .transition().duration(500)
+      .attr('fill', d => heatColor(getValue(d)) + (dark ? '35' : '25'))
+      .attr('stroke', d => heatColor(getValue(d)))
+  }, [heatmap, nodeCount, theme])
 
   useEffect(() => { loadAndDraw() }, [theme])
 
@@ -353,6 +397,87 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
     applyPathHighlight(null)
   }
 
+  // ─────────────────────────────────────────────
+  // Mini-map renderer
+  // Draws a tiny version of the graph in the corner
+  // Updates on every simulation tick
+  // ─────────────────────────────────────────────
+  function updateMinimap(nodes: GraphNode[], edges: GraphEdge[]) {
+    if (!minimapRef.current) return
+    const W = 160, H = 88
+
+    const mm = d3.select(minimapRef.current)
+    mm.selectAll('*').remove()
+
+    if (nodes.length === 0) return
+
+    // Calculate bounds of current node positions
+    const xs = nodes.map(n => n.x ?? 0)
+    const ys = nodes.map(n => n.y ?? 0)
+    const minX = Math.min(...xs), maxX = Math.max(...xs)
+    const minY = Math.min(...ys), maxY = Math.max(...ys)
+    const rangeX = maxX - minX || 1
+    const rangeY = maxY - minY || 1
+
+    const pad = 10
+    const scaleX = (W - pad * 2) / rangeX
+    const scaleY = (H - pad * 2) / rangeY
+    const scale  = Math.min(scaleX, scaleY)
+
+    const tx = (n: GraphNode) => pad + ((n.x ?? 0) - minX) * scale
+    const ty = (n: GraphNode) => pad + ((n.y ?? 0) - minY) * scale
+
+    // Draw edges
+    mm.append('g').selectAll('line')
+      .data(edges).enter().append('line')
+      .attr('x1', d => tx(d.source as GraphNode))
+      .attr('y1', d => ty(d.source as GraphNode))
+      .attr('x2', d => tx(d.target as GraphNode))
+      .attr('y2', d => ty(d.target as GraphNode))
+      .attr('stroke', isDark ? '#2a2a2a' : '#cccccc')
+      .attr('stroke-width', 0.8)
+      .attr('opacity', 0.6)
+
+    // Draw nodes
+    mm.append('g').selectAll('circle')
+      .data(nodes).enter().append('circle')
+      .attr('cx', tx)
+      .attr('cy', ty)
+      .attr('r', d => 2.5 + Math.min(d.refCount * 0.5, 3))
+      .attr('fill', d => d.coverColor)
+      .attr('opacity', 0.85)
+
+    // Draw viewport rectangle showing current view
+    if (svgRef.current) {
+      const svgW   = svgRef.current.clientWidth  || 800
+      const svgH   = svgRef.current.clientHeight || 600
+      const tr     = d3.zoomTransform(svgRef.current)
+
+      // Viewport corners in graph space
+      const vpX1 = (-tr.x) / tr.k
+      const vpY1 = (-tr.y) / tr.k
+      const vpX2 = (svgW - tr.x) / tr.k
+      const vpY2 = (svgH - tr.y) / tr.k
+
+      // Convert to minimap space
+      const mmX1 = pad + (vpX1 - minX) * scale
+      const mmY1 = pad + (vpY1 - minY) * scale
+      const mmW  = (vpX2 - vpX1) * scale
+      const mmH  = (vpY2 - vpY1) * scale
+
+      mm.append('rect')
+        .attr('x',      mmX1)
+        .attr('y',      mmY1)
+        .attr('width',  Math.max(10, mmW))
+        .attr('height', Math.max(8,  mmH))
+        .attr('fill',   'transparent')
+        .attr('stroke', '#4f6ef7')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.7)
+        .attr('rx', 2)
+    }
+  }
+
   function drawGraph(rawNodes: GraphNode[], rawEdges: GraphEdge[]) {
     const svg    = d3.select(svgRef.current!)
     const width  = svgRef.current!.clientWidth  || 800
@@ -365,7 +490,11 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
     // ── ZOOM ──
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 6])
-      .on('zoom', e => root.attr('transform', e.transform.toString()))
+      .on('zoom', e => {
+        root.attr('transform', e.transform.toString())
+        // Update minimap viewport rectangle
+        updateMinimap(rawNodes, rawEdges)
+      })
 
     zoomRef.current = zoom
     svg.call(zoom as any)
@@ -670,6 +799,8 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
 
     // ── TICK ──
     simulation.on('tick', () => {
+      // Update minimap
+      updateMinimap(rawNodes, rawEdges)
       linkGroup.selectAll<SVGLineElement, GraphEdge>('.link-line')
         .attr('x1', (d: GraphEdge) => (d.source as GraphNode).x ?? 0)
         .attr('y1', (d: GraphEdge) => (d.source as GraphNode).y ?? 0)
@@ -778,6 +909,32 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
             </button>
           ))}
 
+          {/* Heatmap toggle */}
+          <div className="flex rounded-lg overflow-hidden"
+               style={{ border: `0.5px solid ${C.border}` }}>
+            {([
+              { key: 'none',  label: '◐ Default' },
+              { key: 'refs',  label: '🔥 Refs'   },
+              { key: 'links', label: '🔥 Links'  },
+            ] as const).map((h, i) => (
+              <button key={h.key}
+                      onClick={() => setHeatmap(h.key)}
+                      title={
+                        h.key === 'none'  ? 'Default colors' :
+                        h.key === 'refs'  ? 'Heat by reference count' :
+                        'Heat by connection count'
+                      }
+                      className="px-2.5 py-1.5 text-[10px] transition-colors"
+                      style={{
+                        background: heatmap === h.key ? '#ef444430' : C.surface,
+                        color:      heatmap === h.key ? '#ef4444'   : C.textMuted,
+                        borderLeft: i > 0 ? `0.5px solid ${C.border}` : undefined,
+                      }}>
+                {h.label}
+              </button>
+            ))}
+          </div>
+
           <button onClick={onClose}
                   className="w-8 h-8 flex items-center justify-center rounded-lg"
                   style={{ background: C.surface, border: `0.5px solid ${C.border}`,
@@ -846,6 +1003,86 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
                       cursor: mode === 'connect' ? 'crosshair'
                             : mode === 'path'    ? 'cell'
                             : 'default' }} />
+
+        {/* MINIMAP */}
+        {showMinimap && !loading && nodeCount > 1 && (
+          <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-xl"
+               style={{
+                 width:  160,
+                 height: 110,
+                 background: C.surface + 'ee',
+                 border: `0.5px solid ${C.border}`,
+                 backdropFilter: 'blur(8px)',
+               }}>
+            {/* Minimap header */}
+            <div className="flex items-center justify-between px-2 py-1"
+                 style={{ borderBottom: `0.5px solid ${C.border}` }}>
+              <span className="text-[9px] font-medium" style={{ color: C.textMuted }}>
+                Overview
+              </span>
+              <button
+                onClick={() => setShowMinimap(false)}
+                className="text-[10px] leading-none"
+                style={{ color: C.textMuted }}
+              >×</button>
+            </div>
+            <svg ref={minimapRef} width="160" height="88"
+                 style={{ display: 'block' }} />
+          </div>
+        )}
+
+        {/* Show minimap button when hidden */}
+        {!showMinimap && !loading && nodeCount > 1 && (
+          <button
+            onClick={() => setShowMinimap(true)}
+            className="absolute bottom-4 right-4 px-2 py-1.5 rounded-xl text-[10px]"
+            style={{ background: C.surface + 'ee',
+                     border: `0.5px solid ${C.border}`,
+                     color: C.textMuted,
+                     backdropFilter: 'blur(8px)' }}
+          >
+            🗺 Map
+          </button>
+        )}
+
+        {/* HEATMAP LEGEND */}
+        {heatmap !== 'none' && !loading && nodeCount > 0 && (
+          <div className="absolute top-4 right-4 px-3 py-2.5 rounded-xl text-[10px]"
+               style={{
+                 background:     (theme === 'dark' ? '#111' : '#fff') + 'ee',
+                 border:         `0.5px solid ${theme === 'dark' ? '#1e1e1e' : '#e5e5e5'}`,
+                 backdropFilter: 'blur(8px)',
+               }}>
+            <p className="font-medium mb-2"
+               style={{ color: theme === 'dark' ? '#555' : '#999' }}>
+              Heat map — {heatmap === 'refs' ? 'by references' : 'by connections'}
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {[
+                { color: '#ef4444', label: 'Very high' },
+                { color: '#f97316', label: 'High'      },
+                { color: '#eab308', label: 'Medium'    },
+                { color: '#22c55e', label: 'Low'       },
+                { color: '#3b82f6', label: 'None / minimal' },
+              ].map(item => (
+                <div key={item.color} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0"
+                       style={{ background: item.color }} />
+                  <span style={{ color: theme === 'dark' ? '#555' : '#999' }}>
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setHeatmap('none')}
+              className="mt-2 text-[9px] hover:underline w-full text-center"
+              style={{ color: theme === 'dark' ? '#444' : '#aaa' }}
+            >
+              Reset to default colors
+            </button>
+          </div>
+        )}
 
         {/* HOVER CARD */}
         {hoverCard && mode === 'navigate' && !focusedNode && (

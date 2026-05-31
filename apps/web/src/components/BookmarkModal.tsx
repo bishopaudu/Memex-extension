@@ -562,10 +562,37 @@ export function BookmarkModal({ bookmark, onClose, onDelete, onTagClick }: Props
 // Note card with copy button
 // ─────────────────────────────────────────────
 function NoteCard({ att, index }: { att: any; index: number }) {
-  const [copied, setCopied] = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const [expanded,  setExpanded]  = useState(false)
+  const content = att.content ?? ''
+
+  // Detect extraction type from content prefix
+  const isExtract  = content.startsWith('📝 Article text') ||
+                     content.startsWith('🖼️ Images extracted') ||
+                     content.startsWith('🔗 Links extracted')
+  const isLong     = content.length > 400
+  const displayContent = isLong && !expanded
+    ? content.slice(0, 400) + '...'
+    : content
+
+  // Detect emoji/type from first line
+  const firstLine  = content.split('\n')[0] ?? ''
+  const typeEmoji  = firstLine.startsWith('📝') ? '📝'
+                   : firstLine.startsWith('🖼️') ? '🖼️'
+                   : firstLine.startsWith('🔗') ? '🔗'
+                   : '📝'
+  const typeLabel  = firstLine.startsWith('📝') ? 'Article text'
+                   : firstLine.startsWith('🖼️') ? 'Images'
+                   : firstLine.startsWith('🔗') ? 'Links'
+                   : `Note ${index}`
+
+  const accentColor = firstLine.startsWith('📝') ? '#4f6ef7'
+                    : firstLine.startsWith('🖼️') ? '#10b981'
+                    : firstLine.startsWith('🔗') ? '#f59e0b'
+                    : '#4f6ef7'
 
   async function copy() {
-    await navigator.clipboard.writeText(att.content ?? '').catch(() => {})
+    await navigator.clipboard.writeText(content).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -573,43 +600,53 @@ function NoteCard({ att, index }: { att: any; index: number }) {
   return (
     <div className="group relative bg-surface-3 border border-surface-4
                     rounded-xl overflow-hidden">
-      {/* Header bar */}
+      {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-surface-4">
-        <span className="text-sm">📝</span>
-        <span className="text-[11px] font-medium text-ink-2">Note {index}</span>
+        <span className="text-sm">{typeEmoji}</span>
+        <span className="text-[11px] font-medium text-ink-2">{typeLabel}</span>
         {att.label && (
           <span className="text-[10px] text-ink-4">— {att.label}</span>
         )}
-
-        {/* Copy button — appears on hover */}
-        <button
-          onClick={copy}
-          className="ml-auto flex items-center gap-1 text-[10px] text-ink-4
-                     hover:text-ink-2 transition-colors opacity-0
-                     group-hover:opacity-100"
-        >
-          {copied ? (
-            <span className="text-green-400">Copied ✓</span>
-          ) : (
-            <>
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
-                   stroke="currentColor" strokeWidth={2}>
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-              </svg>
-              Copy
-            </>
+        <div className="ml-auto flex items-center gap-2">
+          {isLong && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-[10px] text-ink-4 hover:text-ink-2 transition-colors"
+            >
+              {expanded ? 'Show less ↑' : 'Show more ↓'}
+            </button>
           )}
-        </button>
+          <button
+            onClick={copy}
+            className="flex items-center gap-1 text-[10px] text-ink-4
+                       hover:text-ink-2 transition-colors opacity-0
+                       group-hover:opacity-100"
+          >
+            {copied ? (
+              <span className="text-green-400">Copied ✓</span>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" strokeWidth={2}>
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                </svg>
+                Copy
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Content — left accent border */}
+      {/* Content */}
       <div className="flex">
-        <div className="w-0.5 bg-brand flex-shrink-0" />
-        <p className="flex-1 px-4 py-3 text-sm text-ink-1 leading-relaxed
-                      whitespace-pre-wrap">
-          {att.content}
-        </p>
+        <div className="w-0.5 flex-shrink-0"
+             style={{ background: accentColor }} />
+        <div className="flex-1 px-4 py-3 min-w-0">
+          <p className="text-xs text-ink-1 leading-relaxed whitespace-pre-wrap break-words">
+            {displayContent}
+          </p>
+        </div>
       </div>
     </div>
   )

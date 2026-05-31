@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { collectionsApi } from '../lib/api'
 import { BookmarkCard }        from '../components/BookmarkCard'
+import { BookmarkDetailPage }  from './BookmarkDetailPage'
 import { BookmarkModalLoader } from '../components/BookmarkModalLoader'
 
 interface Props {
@@ -17,6 +18,7 @@ export function CollectionDetailPage({
   const [collection, setCollection] = useState<any | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detailId,   setDetailId]   = useState<string | null>(null)
   const [view,       setView]       = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
@@ -36,6 +38,17 @@ export function CollectionDetailPage({
       ...prev,
       bookmarks: prev.bookmarks.filter((b: any) => b.id !== bookmarkId),
     }))
+  }
+
+  if (detailId) {
+    return (
+      <BookmarkDetailPage
+        bookmarkId={detailId}
+        onBack={() => setDetailId(null)}
+        onDelete={id => { handleDelete(id); setDetailId(null) }}
+        onTagClick={tag => { onTagClick(tag); onBack() }}
+      />
+    )
   }
 
   if (loading) {
@@ -172,7 +185,7 @@ export function CollectionDetailPage({
                   collections={allCollections}
                   onDelete={handleDelete}
                   onTagClick={tag => { onTagClick(tag); onBack() }}
-                  onOpenModal={b => setSelectedId(b.id)}
+                  onOpenModal={b => setDetailId(b.id)}
                   onCollectionsChange={onCollectionsChange}
                 />
               ))}
@@ -187,7 +200,7 @@ export function CollectionDetailPage({
                   key={b.id}
                   bookmark={b}
                   onDelete={handleDelete}
-                  onOpenModal={b => setSelectedId(b.id)}
+                  onOpenModal={b => setDetailId(b.id)}
                 />
               ))}
             </div>

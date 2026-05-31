@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { bookmarksApi, attachmentsApi } from '../lib/api'
-import { SmartTagInput } from './SmartTagInput'
+import { SmartTagInput }  from './SmartTagInput'
+import { ExtractPanel }  from './ExtractPanel'
 import { cropImage } from '../lib/crop'
 
 const DASHBOARD_URL = 'http://localhost:5173'
@@ -37,7 +38,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const [addingText,    setAddingText]    = useState(false)
   const [textInput,     setTextInput]     = useState('')
   const [selectingArea,  setSelectingArea]  = useState(false)
-  const [extracting,       setExtracting]       = useState(false)
+  const [showExtract,      setShowExtract]      = useState(false)
   const [pendingHighlight, setPendingHighlight] = useState<{
     text: string; context: string; url: string; title: string
   } | null>(null)
@@ -136,31 +137,6 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
   function retryAreaSelect() { setAreaPreview(null); startAreaSelect() }
 
-  async function extractPageContent() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (!tab?.id) return
-    setExtracting(true)
-    try {
-      const result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_PAGE_CONTENT' })
-      if (result?.content) {
-        // Add as a text attachment with the extracted content
-        const summary = result.excerpt || result.content.slice(0, 300)
-        setAttachments(prev => [...prev, {
-          id:      crypto.randomUUID(),
-          type:    'text' as const,
-          content: `📄 Extracted content\n\n${summary}${result.content.length > 300 ? '...' : ''}`,
-          status:  'pending' as const,
-        }])
-        // Also update description if empty
-        if (pageInfo && !pageInfo.description && result.excerpt) {
-          setPageInfo(prev => prev ? { ...prev, description: result.excerpt } : prev)
-        }
-      }
-    } catch (err) {
-      console.error('Extraction failed:', err)
-    }
-    setExtracting(false)
-  }
 
   function addTextNote() {
     if (!textInput.trim()) return
@@ -502,8 +478,22 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </div>
           )}
 
+          {/* Extract panel */}
+          {showExtract && (
+            <ExtractPanel
+              onAdd={att => {
+                setAttachments(prev => [...prev, {
+                  ...att,
+                  id:     crypto.randomUUID(),
+                  status: 'pending' as const,
+                }])
+              }}
+              onClose={() => setShowExtract(false)}
+            />
+          )}
+
           {/* Attachment buttons */}
-          {!addingText && !areaPreview && (
+          {!addingText && !areaPreview && !showExtract && (
             <div className="grid grid-cols-2 gap-2">
               <AttachBtn emoji="📸" label="Screenshot" onClick={addFullScreenshot} />
               <AttachBtn
@@ -516,11 +506,10 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
               <AttachBtn emoji="📝" label="Text note"
                          onClick={() => setAddingText(true)} />
               <AttachBtn
-                emoji={extracting ? '⏳' : '📰'}
-                label={extracting ? 'Extracting...' : 'Extract page'}
-                onClick={extractPageContent}
-                disabled={extracting}
-                hint="Extract readable text from this page"
+                emoji="📰"
+                label="Extract page"
+                onClick={() => setShowExtract(true)}
+                hint="Extract text, images or links from this page"
               />
             </div>
           )}
