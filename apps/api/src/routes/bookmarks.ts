@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { db, bookmarks, tags, bookmarkTags, attachments, bookmarkCollections } from '../db'
 import { eq, and, desc, sql, inArray } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
-import { generateTags, generateSummary, enhanceSearchQuery } from '../lib/ai'
 
 const bookmarksRouter = new Hono<{
   Variables: { userId: string; userEmail: string }
@@ -29,10 +28,12 @@ const createBookmarkSchema = z.object({
 })
 
 const updateBookmarkSchema = z.object({
-  title:       z.string().optional(),
-  description: z.string().optional(),
-  isArchived:  z.boolean().optional(),
-  tags:        z.array(z.string()).optional(),
+  title:         z.string().optional(),
+  description:   z.string().optional(),
+  isArchived:    z.boolean().optional(),
+  screenshotUrl: optionalUrl,
+  screenshotKey: z.string().optional(),
+  tags:          z.array(z.string()).optional(),
 })
 
 // ─────────────────────────────────────────────
@@ -40,17 +41,12 @@ const updateBookmarkSchema = z.object({
 // ─────────────────────────────────────────────
 bookmarksRouter.get('/', async (c) => {
   const userId       = c.get('userId')
-  let   search       = c.req.query('search') ?? ''
+  const search       = c.req.query('search') ?? ''
   const tagFilter    = c.req.query('tag')    ?? ''
   const page         = parseInt(c.req.query('page')  ?? '1')
   const limit        = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
   const offset       = (page - 1) * limit
-
   const collectionId = c.req.query('collectionId') ?? ''
-
-  if (search.length > 10 && search.includes(' ')) {
-    search = await enhanceSearchQuery(search)
-  }
 
   // If filtering by collection, get bookmark IDs first
   let collectionBookmarkIds: string[] = []
@@ -61,19 +57,38 @@ bookmarksRouter.get('/', async (c) => {
       .where(eq(bookmarkCollections.collectionId, collectionId))
     collectionBookmarkIds = rows.map(r => r.bookmarkId)
 
-    // No bookmarks in collection — return early
     if (collectionBookmarkIds.length === 0) {
       return c.json({ data: { items: [], page, limit }, error: null })
     }
   }
 
-  // Step 1: fetch bookmarks with tags
+  // Tag filter — get bookmark IDs that have this tag
+  let tagBookmarkIds: string[] = []
+  if (tagFilter) {
+    const tagRows = await db
+      .select({ bookmarkId: bookmarkTags.bookmarkId })
+      .from(bookmarkTags)
+      .innerJoin(tags, and(
+        eq(tags.id, bookmarkTags.tagId),
+        eq(tags.name, tagFilter),
+        eq(tags.userId, userId)
+      ))
+    tagBookmarkIds = tagRows.map(r => r.bookmarkId)
+
+    if (tagBookmarkIds.length === 0) {
+      return c.json({ data: { items: [], page, limit }, error: null })
+    }
+  }
+
   const results = await db.query.bookmarks.findMany({
     where: and(
       eq(bookmarks.userId, userId),
       eq(bookmarks.isArchived, false),
       collectionId && collectionBookmarkIds.length > 0
         ? inArray(bookmarks.id, collectionBookmarkIds)
+        : undefined,
+      tagFilter && tagBookmarkIds.length > 0
+        ? inArray(bookmarks.id, tagBookmarkIds)
         : undefined,
       search
         ? sql`to_tsvector('english',
@@ -95,21 +110,13 @@ bookmarksRouter.get('/', async (c) => {
     return c.json({ data: { items: [], page, limit }, error: null })
   }
 
-  // Step 2: fetch attachments separately for all bookmarks
-  // This is more reliable than relying on Drizzle relations
+  // Fetch attachments for all bookmarks
   const bookmarkIds = results.map(b => b.id)
-
   const allAttachments = await db
     .select()
     .from(attachments)
-    .where(
-      sql`${attachments.bookmarkId} = ANY(ARRAY[${sql.join(
-        bookmarkIds.map(id => sql`${id}::uuid`),
-        sql`, `
-      )}])`
-    )
+    .where(inArray(attachments.bookmarkId, bookmarkIds))
 
-  // Group attachments by bookmarkId for fast lookup
   const attachmentsByBookmark = allAttachments.reduce((acc, att) => {
     if (!acc[att.bookmarkId]) acc[att.bookmarkId] = []
     acc[att.bookmarkId].push(att)
@@ -135,28 +142,12 @@ bookmarksRouter.get('/', async (c) => {
 })
 
 // ─────────────────────────────────────────────
-// POST /bookmarks
+// POST /bookmarks — NO AI, instant save
 // ─────────────────────────────────────────────
 bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) => {
   const userId = c.get('userId')
   const input  = c.req.valid('json')
-
-  const [aiTags, aiSummary] = await Promise.all([
-    generateTags({
-      url:         input.url,
-      title:       input.title       ?? '',
-      description: input.description ?? '',
-    }),
-    generateSummary({
-      url:         input.url,
-      title:       input.title       ?? '',
-      description: input.description ?? '',
-    }),
-  ])
-
-  const userTags       = input.tags ?? []
-  const allTags        = [...new Set([...userTags, ...aiTags])]
-  const finalDesc      = input.description || aiSummary || null
+  const userTags = input.tags ?? []
 
   const bookmark = await db.transaction(async (tx) => {
     const [newBookmark] = await tx
@@ -165,7 +156,7 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
         userId,
         url:           input.url,
         title:         input.title         ?? null,
-        description:   finalDesc,
+        description:   input.description   ?? null,
         faviconUrl:    input.faviconUrl    ?? null,
         ogImageUrl:    input.ogImageUrl    ?? null,
         screenshotUrl: input.screenshotUrl ?? null,
@@ -173,8 +164,8 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
       })
       .returning()
 
-    for (const tagName of allTags) {
-      const clean = tagName.toLowerCase().trim().replace(/[^a-z0-9\-\s]/g, '')
+    for (const tagName of userTags) {
+      const clean = tagName.toLowerCase().trim().replace(/[^a-z0-9\-]/g, '')
       if (!clean) continue
 
       const [tag] = await tx
@@ -204,11 +195,11 @@ bookmarksRouter.post('/', zValidator('json', createBookmarkSchema), async (c) =>
     return newBookmark
   })
 
-  return c.json({ data: { bookmark, aiTags, aiSummary }, error: null }, 201)
+  return c.json({ data: { bookmark }, error: null }, 201)
 })
 
 // ─────────────────────────────────────────────
-// GET /bookmarks/:id  — includes attachments
+// GET /bookmarks/:id
 // ─────────────────────────────────────────────
 bookmarksRouter.get('/:id', async (c) => {
   const userId = c.get('userId')
@@ -226,7 +217,6 @@ bookmarksRouter.get('/:id', async (c) => {
     }, 404)
   }
 
-  // Fetch attachments separately — always reliable
   const bookmarkAttachments = await db
     .select()
     .from(attachments)
@@ -266,14 +256,17 @@ bookmarksRouter.patch('/:id', zValidator('json', updateBookmarkSchema), async (c
   }
 
   await db.transaction(async (tx) => {
+    // Build update object — only include fields that were sent
+    const updates: Record<string, any> = { updatedAt: new Date() }
+    if (input.title         !== undefined) updates.title         = input.title
+    if (input.description   !== undefined) updates.description   = input.description
+    if (input.isArchived    !== undefined) updates.isArchived    = input.isArchived
+    if (input.screenshotUrl !== undefined) updates.screenshotUrl = input.screenshotUrl
+    if (input.screenshotKey !== undefined) updates.screenshotKey = input.screenshotKey
+
     await tx
       .update(bookmarks)
-      .set({
-        ...(input.title       !== undefined && { title:       input.title }),
-        ...(input.description !== undefined && { description: input.description }),
-        ...(input.isArchived  !== undefined && { isArchived:  input.isArchived }),
-        updatedAt: new Date(),
-      })
+      .set(updates)
       .where(eq(bookmarks.id, id))
 
     if (input.tags !== undefined) {

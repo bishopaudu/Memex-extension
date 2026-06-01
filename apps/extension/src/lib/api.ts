@@ -54,6 +54,16 @@ export const authApi = {
 }
 
 export const bookmarksApi = {
+  async update(id: string, input: {
+    screenshotUrl?: string
+    screenshotKey?: string
+    title?: string
+  }) {
+    return apiFetch(`/api/bookmarks/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(input),
+    })
+  },
   async create(input: {
     url:            string
     title?:         string
@@ -81,6 +91,17 @@ export const uploadApi = {
 }
 
 export const attachmentsApi = {
+  async createScreenshot(
+    bookmarkId: string,
+    url: string,
+    publicId: string,
+    type: 'screenshot' | 'area_screenshot' = 'screenshot'
+  ) {
+    return apiFetch(`/api/attachments`, {
+      method: 'POST',
+      body:   JSON.stringify({ bookmarkId, type, url, publicId }),
+    })
+  },
   async createText(bookmarkId: string, content: string, label?: string) {
     return apiFetch<{ attachment: any }>('/api/attachments', {
       method: 'POST',

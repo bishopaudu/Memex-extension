@@ -627,25 +627,61 @@ function parseImages(atts: Attachment[]): {
   src: string; alt: string; width: string; height: string
 }[] {
   const images: { src: string; alt: string; width: string; height: string }[] = []
+  const seen = new Set<string>()
+
   atts.forEach(att => {
     if (!att.content) return
-    const lines = att.content.split('\n').filter(l => l.trim())
+    const lines = att.content.split('\n')
+
+    let currentAlt = ''
+
     lines.forEach(line => {
-      // Format: "1. Alt text\n   https://..."
-      const urlMatch = line.trim().match(/^https?:\/\/\S+/)
+      const trimmed = line.trim()
+
+      // Line like: "1. Image alt text"
+      const numbered = trimmed.match(/^\d+\.\s+(.+)/)
+      if (numbered) {
+        currentAlt = numbered[1]
+          .replace(/\s*\(\d+×\d+\).*$/, '') // strip dimensions
+          .trim()
+        return
+      }
+
+      // Line that is (or contains) a URL
+      const urlMatch = trimmed.match(/https?:\/\/[^\s)]+/)
       if (urlMatch) {
-        const src = urlMatch[0]
-        // Get dimensions if present
-        const dimMatch = src.match(/\((\d+)×(\d+)\)/)
+        let src = urlMatch[0]
+
+        // Clean up — remove trailing dimensions like "(800×600)"
+        src = src.replace(/\(\d+×\d+\)$/, '').trim()
+
+        // Skip duplicates and non-image URLs
+        if (seen.has(src)) return
+        if (!src.match(/\.(jpg|jpeg|png|gif|webp|avif|bmp|tiff)(\?.*)?$/i)) {
+          // Allow URLs without extension if they look like image CDNs
+          const imageHosts = ['images.', 'img.', 'cdn.', 'media.',
+                              'photos.', 'cloudinary', 'imgix', 'unsplash']
+          const isImageHost = imageHosts.some(h =>
+            src.toLowerCase().includes(h)
+          )
+          if (!isImageHost) { currentAlt = ''; return }
+        }
+
+        // Extract dimensions if present after the URL
+        const dimMatch = trimmed.match(/\((\d+)×(\d+)\)/)
+
+        seen.add(src)
         images.push({
-          src:    src.replace(/\s*\(\d+×\d+\)$/, ''),
-          alt:    '',
+          src,
+          alt:    currentAlt,
           width:  dimMatch?.[1] ?? '',
           height: dimMatch?.[2] ?? '',
         })
+        currentAlt = ''
       }
     })
   })
+
   return images.filter(img => img.src.startsWith('http'))
 }
 

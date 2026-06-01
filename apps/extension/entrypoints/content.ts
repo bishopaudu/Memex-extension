@@ -121,41 +121,91 @@ function extractText(): { content: string; excerpt: string; readingTime: number 
 
 function extractImages(): { src: string; alt: string; width: number; height: number }[] {
   const images: { src: string; alt: string; width: number; height: number }[] = []
-  const seen = new Set<string>()
+  const seen    = new Set<string>()
+  const pageHost = window.location.hostname
+
+  // Known CDN and image hosting domains that allow cross-origin loading
+  const safeHosts = [
+    'cloudinary.com', 'imgix.net', 'images.unsplash.com',
+    'upload.wikimedia.org', 'cdn.', 'static.', 'assets.',
+    'media.', 'images.', 'img.', 'photos.', 'pics.',
+    'amazonaws.com', 'googleusercontent.com', 'githubusercontent.com',
+    'gravatar.com', 'wp.com', 'wordpress.com',
+  ]
+
+  // Known problem patterns — skip these
+  const skipPatterns = [
+    'wp-includes',      // WordPress system images (often protected)
+    'wp-admin',
+    'pixel.gif',
+    'pixel.png',
+    '1x1',
+    'spacer',
+    'blank',
+    'transparent',
+    '.svg',             // SVGs often have CORS issues
+    'favicon',
+    'logo-blue-white',  // specific WordPress logo patterns
+  ]
+
+  function isSafeImage(src: string): boolean {
+    try {
+      const url  = new URL(src)
+      const host = url.hostname.toLowerCase()
+      const path = url.pathname.toLowerCase()
+
+      // Same origin is always safe
+      if (host === pageHost) return true
+
+      // Check skip patterns
+      if (skipPatterns.some(p => path.includes(p) || host.includes(p))) return false
+
+      // Check safe CDN hosts
+      if (safeHosts.some(safe => host.includes(safe))) return true
+
+      // Major image formats on any domain — try but mark as potentially unsafe
+      return true
+    } catch {
+      return false
+    }
+  }
 
   document.querySelectorAll('img').forEach(img => {
-    const src = img.src || img.getAttribute('data-src') || ''
+    // Get the best src available
+    const src = img.src
+      || img.getAttribute('data-src')
+      || img.getAttribute('data-lazy-src')
+      || img.getAttribute('data-original')
+      || ''
+
     if (!src || src.startsWith('data:') || seen.has(src)) return
 
     // Filter out tiny images (icons, trackers, spacers)
     const w = img.naturalWidth  || img.width  || 0
     const h = img.naturalHeight || img.height || 0
-    if (w > 0 && w < 50)  return
-    if (h > 0 && h < 50)  return
+    if (w > 0 && w < 80)  return
+    if (h > 0 && h < 80)  return
+
+    // Skip images that are not visible
+    const rect = img.getBoundingClientRect()
+    const style = window.getComputedStyle(img)
+    if (style.display === 'none' || style.visibility === 'hidden') return
+
+    if (!isSafeImage(src)) return
 
     seen.add(src)
     images.push({
       src,
-      alt:    img.alt ?? '',
+      alt:    img.alt ?? img.title ?? '',
       width:  w,
       height: h,
     })
   })
 
-  // Also check for CSS background images in key areas
-  const bgCandidates = document.querySelectorAll(
-    'article, main, .post, .entry, [style*="background-image"]'
-  )
-  bgCandidates.forEach(el => {
-    const style = window.getComputedStyle(el).backgroundImage
-    const match = style.match(/url\(["']?([^"')]+)["']?\)/)
-    if (match && match[1] && !seen.has(match[1])) {
-      seen.add(match[1])
-      images.push({ src: match[1], alt: '', width: 0, height: 0 })
-    }
-  })
+  // Sort by size — larger images first (more likely to be content)
+  images.sort((a, b) => (b.width * b.height) - (a.width * a.height))
 
-  return images.slice(0, 30) // cap at 30
+  return images.slice(0, 24) // cap at 24 (fits 4-col grid nicely)
 }
 
 function extractLinks(): { url: string; text: string; isExternal: boolean }[] {

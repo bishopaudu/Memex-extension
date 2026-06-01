@@ -12,51 +12,31 @@ const attachmentsRouter = new Hono<{
 
 attachmentsRouter.use('*', authMiddleware)
 
-// ─────────────────────────────────────────────
-// POST /attachments
-// Create a new attachment for a bookmark
-// Handles both image uploads (base64) and text
-// ─────────────────────────────────────────────
-const createSchema = z.discriminatedUnion('type', [
-  // Text attachment
-  z.object({
-    type:       z.literal('text'),
-    bookmarkId: z.string().uuid(),
-    content:    z.string().min(1),
-    label:      z.string().optional(),
-  }),
-  // Screenshot attachment (full page, auto-captured)
-  z.object({
-    type:         z.literal('screenshot'),
-    bookmarkId:   z.string().uuid(),
-    imageDataUrl: z.string().startsWith('data:image/'),
-    label:        z.string().optional(),
-  }),
-  // Area screenshot (user-selected region)
-  z.object({
-    type:         z.literal('area_screenshot'),
-    bookmarkId:   z.string().uuid(),
-    imageDataUrl: z.string().startsWith('data:image/'),
-    label:        z.string().optional(),
-  }),
-  // Generic image upload
-  z.object({
-    type:         z.literal('image'),
-    bookmarkId:   z.string().uuid(),
-    imageDataUrl: z.string().startsWith('data:image/'),
-    label:        z.string().optional(),
-  }),
-])
+// Single flat schema — handles all attachment types
+const createSchema = z.object({
+  bookmarkId:   z.string().uuid(),
+  type:         z.enum(['text', 'screenshot', 'area_screenshot', 'image']),
+  // Text
+  content:      z.string().optional(),
+  // Image — either raw base64 or pre-uploaded URL
+  imageDataUrl: z.string().optional(),
+  url:          z.string().optional(),
+  publicId:     z.string().optional(),
+  label:        z.string().optional(),
+})
 
 attachmentsRouter.post('/', zValidator('json', createSchema), async (c) => {
   const userId = c.get('userId')
   const input  = c.req.valid('json')
 
-  // Verify the bookmark belongs to this user
+  // Verify bookmark belongs to this user
   const [bookmark] = await db
     .select({ id: bookmarks.id })
     .from(bookmarks)
-    .where(and(eq(bookmarks.id, input.bookmarkId), eq(bookmarks.userId, userId)))
+    .where(and(
+      eq(bookmarks.id, input.bookmarkId),
+      eq(bookmarks.userId, userId)
+    ))
     .limit(1)
 
   if (!bookmark) {
@@ -66,51 +46,75 @@ attachmentsRouter.post('/', zValidator('json', createSchema), async (c) => {
     }, 404)
   }
 
-  // Text attachment — no upload needed
+  // ── TEXT ATTACHMENT ──
   if (input.type === 'text') {
+    if (!input.content) {
+      return c.json({
+        data:  null,
+        error: { code: 'MISSING_CONTENT', message: 'content is required for text attachments' }
+      }, 400)
+    }
+
     const [attachment] = await db
       .insert(attachments)
       .values({
         bookmarkId: input.bookmarkId,
         userId,
-        type:    'text',
-        content: input.content,
-        label:   input.label ?? null,
+        type:       'text',
+        content:    input.content,
+        label:      input.label ?? null,
       })
       .returning()
 
     return c.json({ data: { attachment }, error: null }, 201)
   }
 
-  // Image-based attachment — upload to Cloudinary
-  const uploaded = await uploadScreenshot(input.imageDataUrl, userId)
+  // ── IMAGE ATTACHMENT ──
+  let finalUrl:      string
+  let finalPublicId: string | null = null
 
-  if (!uploaded) {
+  if (input.url) {
+    // Pre-uploaded — just store the URL
+    finalUrl      = input.url
+    finalPublicId = input.publicId ?? null
+    console.log('[Attachments] Using pre-uploaded URL:', finalUrl)
+  } else if (input.imageDataUrl) {
+    // Raw base64 — upload to Cloudinary
+    console.log('[Attachments] Uploading base64 image to Cloudinary...')
+    const uploaded = await uploadScreenshot(input.imageDataUrl, userId)
+    if (!uploaded) {
+      return c.json({
+        data:  null,
+        error: { code: 'UPLOAD_FAILED', message: 'Image upload to Cloudinary failed' }
+      }, 500)
+    }
+    finalUrl      = uploaded.url
+    finalPublicId = uploaded.publicId
+    console.log('[Attachments] Uploaded to Cloudinary:', finalUrl)
+  } else {
     return c.json({
       data:  null,
-      error: { code: 'UPLOAD_FAILED', message: 'Image upload failed' }
-    }, 500)
+      error: { code: 'MISSING_IMAGE', message: 'Provide imageDataUrl or url' }
+    }, 400)
   }
 
   const [attachment] = await db
     .insert(attachments)
     .values({
-      bookmarkId:  input.bookmarkId,
+      bookmarkId: input.bookmarkId,
       userId,
-      type:        input.type,
-      url:         uploaded.url,
-      storageKey:  uploaded.publicId,
-      label:       input.label ?? null,
+      type:       input.type,
+      url:        finalUrl,
+      storageKey: finalPublicId,
+      label:      input.label ?? null,
     })
     .returning()
 
+  console.log('[Attachments] Created attachment:', attachment.id, attachment.type)
   return c.json({ data: { attachment }, error: null }, 201)
 })
 
-// ─────────────────────────────────────────────
-// GET /attachments?bookmarkId=xxx
-// Get all attachments for a bookmark
-// ─────────────────────────────────────────────
+// ── GET /attachments?bookmarkId=xxx ──
 attachmentsRouter.get('/', async (c) => {
   const userId     = c.get('userId')
   const bookmarkId = c.req.query('bookmarkId')
@@ -133,9 +137,7 @@ attachmentsRouter.get('/', async (c) => {
   return c.json({ data: { items: result }, error: null })
 })
 
-// ─────────────────────────────────────────────
-// DELETE /attachments/:id
-// ─────────────────────────────────────────────
+// ── DELETE /attachments/:id ──
 attachmentsRouter.delete('/:id', async (c) => {
   const userId = c.get('userId')
   const id     = c.req.param('id')
@@ -143,7 +145,10 @@ attachmentsRouter.delete('/:id', async (c) => {
   const [attachment] = await db
     .select()
     .from(attachments)
-    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
+    .where(and(
+      eq(attachments.id, id),
+      eq(attachments.userId, userId)
+    ))
     .limit(1)
 
   if (!attachment) {
@@ -153,7 +158,6 @@ attachmentsRouter.delete('/:id', async (c) => {
     }, 404)
   }
 
-  // Delete from Cloudinary if it's an image
   if (attachment.storageKey) {
     await deleteScreenshot(attachment.storageKey)
   }

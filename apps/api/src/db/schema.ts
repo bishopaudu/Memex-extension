@@ -42,6 +42,7 @@ export const bookmarks = pgTable('bookmarks', {
   title:          text('title'),
   description:    text('description'),
   screenshotUrl:  text('screenshot_url'),
+  screenshotKey: text('screenshot_key'),
   faviconUrl:     text('favicon_url'),
   ogImageUrl:     text('og_image_url'),
   isArchived:     boolean('is_archived').default(false),

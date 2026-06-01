@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { bookmarksApi, attachmentsApi } from '../lib/api'
+import { bookmarksApi, attachmentsApi, uploadApi } from '../lib/api'
 import { SmartTagInput }  from './SmartTagInput'
 import { ExtractPanel }  from './ExtractPanel'
 import { cropImage } from '../lib/crop'
@@ -157,10 +157,27 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     setSaveState('saving')
     setErrorMsg('')
 
+    // ── Step 1: Capture auto-screenshot BEFORE bookmark is created
+    // We do this first because the popup closes during save and
+    // captureVisibleTab only works while the tab is still active
+    let autoScreenshotDataUrl: string | null = null
+    try {
+      autoScreenshotDataUrl = await chrome.tabs.captureVisibleTab(
+        undefined,
+        { format: 'png', quality: 85 }
+      )
+    } catch {
+      // Screenshot capture can fail on chrome:// pages etc — that's fine
+    }
+
+    // ── Step 2: Create the bookmark
     const result = await bookmarksApi.create({
-      url: pageInfo.url, title: title || pageInfo.title,
-      description: pageInfo.description, faviconUrl: pageInfo.faviconUrl,
-      ogImageUrl: pageInfo.ogImageUrl, tags,
+      url:         pageInfo.url,
+      title:       title || pageInfo.title,
+      description: pageInfo.description,
+      faviconUrl:  pageInfo.faviconUrl,
+      ogImageUrl:  pageInfo.ogImageUrl,
+      tags,
     })
 
     if (result.error) {
@@ -170,22 +187,69 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     }
 
     const bookmarkId = result.data.bookmark.id
+
+    // ── Step 3: Upload auto-screenshot + patch bookmark with URL
+    // Do this BEFORE setSaveState so popup stays open during upload
+    if (autoScreenshotDataUrl) {
+      try {
+        const uploadResult = await uploadApi.uploadScreenshot(autoScreenshotDataUrl)
+        if (!uploadResult.error && uploadResult.data?.url) {
+          await bookmarksApi.update(bookmarkId, {
+            screenshotUrl: uploadResult.data.url,
+            screenshotKey: uploadResult.data.publicId,
+          })
+        }
+      } catch {
+        // Non-critical — bookmark saved, screenshot just won't show
+      }
+    }
+
+    // ── Step 4: Upload manual attachments (notes, area crops)
+    // Also BEFORE setSaveState so popup stays alive during uploads
+    await uploadAttachments(bookmarkId)
+
+    // ── Step 5: NOW show saved state — all uploads complete
     setSaveState('saved')
-    uploadAttachments(bookmarkId)
   }
 
   async function uploadAttachments(bookmarkId: string) {
     for (const att of attachments) {
-      setAttachments(prev => prev.map(a => a.id === att.id ? { ...a, status: 'uploading' } : a))
+      setAttachments(prev =>
+        prev.map(a => a.id === att.id ? { ...a, status: 'uploading' } : a)
+      )
       try {
         if (att.type === 'text' && att.content) {
           await attachmentsApi.createText(bookmarkId, att.content)
         } else if (att.preview) {
-          await attachmentsApi.createAreaScreenshot(bookmarkId, att.preview)
+          console.log('[Memex] Uploading image attachment, type:', att.type)
+          const uploadResult = await uploadApi.uploadScreenshot(att.preview)
+          console.log('[Memex] Upload result:', uploadResult)
+          if (uploadResult.error) {
+            console.error('[Memex] Upload failed:', uploadResult.error)
+            throw new Error(uploadResult.error.message)
+          }
+          if (uploadResult.data?.url) {
+            const attResult = await attachmentsApi.createScreenshot(
+              bookmarkId,
+              uploadResult.data.url,
+              uploadResult.data.publicId,
+              att.type === 'area_screenshot' ? 'area_screenshot' : 'screenshot'
+            )
+            console.log('[Memex] Attachment created:', attResult)
+            if (attResult.error) {
+              console.error('[Memex] Create attachment failed:', attResult.error)
+              throw new Error(attResult.error.message)
+            }
+          }
         }
-        setAttachments(prev => prev.map(a => a.id === att.id ? { ...a, status: 'done' } : a))
-      } catch {
-        setAttachments(prev => prev.map(a => a.id === att.id ? { ...a, status: 'error' } : a))
+        setAttachments(prev =>
+          prev.map(a => a.id === att.id ? { ...a, status: 'done' } : a)
+        )
+      } catch (err) {
+        console.error('[Memex] Attachment upload failed:', err, att)
+        setAttachments(prev =>
+          prev.map(a => a.id === att.id ? { ...a, status: 'error' } : a)
+        )
       }
     }
   }
@@ -535,7 +599,9 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             <>
               <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white
                               rounded-full animate-spin" />
-              Saving...
+              {attachments.length > 0
+                ? 'Saving & uploading...'
+                : 'Saving...'}
             </>
           ) : (
             <>
