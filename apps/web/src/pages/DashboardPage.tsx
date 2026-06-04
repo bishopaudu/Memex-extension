@@ -10,6 +10,7 @@ import { CollectionsPage }        from './CollectionsPage'
 import { SearchModal }             from '../components/SearchModal'
 import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
+import { ArchivePage }             from './ArchivePage'
 import { TopicPage }               from './TopicPage'
 
 interface Props {
@@ -23,6 +24,7 @@ type Page =
   | { type: 'collection-detail'; collectionId: string }
   | { type: 'wiki' }
   | { type: 'topic'; topicId: string }
+  | { type: 'archive' }
   | { type: 'bookmark-detail'; bookmarkId: string }
 
 export function DashboardPage({ theme, toggleTheme }: Props) {
@@ -99,6 +101,12 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
     else { fetchTags(); fetchCollections() }
   }
 
+  async function handleArchive(id: string) {
+    setBookmarks(prev => prev.filter(b => b.id !== id))
+    await bookmarksApi.archive(id)
+    fetchTags()
+  }
+
   function handleTagClick(tag: string) {
     setActiveTag(prev => prev === tag ? '' : tag)
     setActiveCollection('')
@@ -113,9 +121,13 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const user = auth.status === 'authenticated' ? auth.user : null
 
   // Sidebar current page indicator
-  const sidebarPage =
-    page.type === 'collections' || page.type === 'collection-detail' ? 'collections'
-    : page.type === 'wiki' || page.type === 'topic' ? 'wiki'
+  const sidebarPage: 'home' | 'collections' | 'wiki' | 'archive' =
+    page.type === 'collections' || page.type === 'collection-detail'
+      ? 'collections'
+    : page.type === 'wiki'    || page.type === 'topic'
+      ? 'wiki'
+    : page.type === 'archive'
+      ? 'archive'
     : 'home'
 
   return (
@@ -132,10 +144,12 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
         onCollectionsChange={fetchCollections}
         onOpenCollectionsPage={() => setPage({ type: 'collections' })}
         onOpenWikiPage={() => setPage({ type: 'wiki' })}
+        onOpenArchive={() => setPage({ type: 'archive' })}
         onGoHome={() => {
           setPage({ type: 'home' })
           setActiveCollection('')
           setActiveTag('')
+          setSearch('')
         }}
         userEmail={user?.email ?? ''}
         onLogout={logout}
@@ -183,6 +197,13 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
           onBack={() => setPage({ type: 'collections' })}
           onTagClick={handleTagClick}
           onCollectionsChange={fetchCollections}
+        />
+      )}
+
+      {/* ── ARCHIVE PAGE ── */}
+      {page.type === 'archive' && (
+        <ArchivePage
+          onOpenBookmark={id => setPage({ type: 'bookmark-detail', bookmarkId: id })}
         />
       )}
 

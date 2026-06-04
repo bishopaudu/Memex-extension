@@ -61,6 +61,24 @@ export const bookmarksApi = {
   async getOne(id: string) {
     return apiFetch<{ bookmark: any }>(`/api/bookmarks/${id}`)
   },
+  async listArchived() {
+    return apiFetch<{ items: any[] }>('/api/bookmarks?archived=true')
+  },
+
+  async archive(id: string) {
+    return apiFetch(`/api/bookmarks/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ isArchived: true }),
+    })
+  },
+
+  async unarchive(id: string) {
+    return apiFetch(`/api/bookmarks/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ isArchived: false }),
+    })
+  },
+
   async delete(id: string) {
     return apiFetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
   },

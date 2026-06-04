@@ -47,6 +47,7 @@ bookmarksRouter.get('/', async (c) => {
   const limit        = Math.min(parseInt(c.req.query('limit') ?? '20'), 100)
   const offset       = (page - 1) * limit
   const collectionId = c.req.query('collectionId') ?? ''
+  const archivedOnly  = c.req.query('archived') === 'true'
 
   // If filtering by collection, get bookmark IDs first
   let collectionBookmarkIds: string[] = []
@@ -83,7 +84,7 @@ bookmarksRouter.get('/', async (c) => {
   const results = await db.query.bookmarks.findMany({
     where: and(
       eq(bookmarks.userId, userId),
-      eq(bookmarks.isArchived, false),
+      archivedOnly ? eq(bookmarks.isArchived, true) : eq(bookmarks.isArchived, false),
       collectionId && collectionBookmarkIds.length > 0
         ? inArray(bookmarks.id, collectionBookmarkIds)
         : undefined,

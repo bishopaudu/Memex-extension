@@ -10,13 +10,14 @@ interface Props {
   activeTag:     string
   activeCollection: string
   bookmarkCount: number
-  currentPage:   'home' | 'collections' | 'wiki'
+  currentPage:   'home' | 'collections' | 'wiki' | 'archive' | 'archive'
   onTagClick:       (tag: string) => void
   onCollectionClick: (id: string) => void
   onCollectionsChange: () => void
   onOpenCollectionsPage: () => void
-  onOpenWikiPage: () => void
-  onGoHome: () => void
+  onOpenWikiPage:   () => void
+  onOpenArchive:    () => void
+  onGoHome:         () => void
   userEmail: string
   onLogout: () => void
 }
@@ -26,7 +27,7 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
   bookmarkCount, currentPage, onTagClick, onCollectionClick,
-  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onGoHome,
+  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onGoHome,
   userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
@@ -64,7 +65,7 @@ export function Sidebar({
         {/* Main nav */}
         <div className="mb-4">
           <button
-            onClick={() => { onTagClick(''); onCollectionClick('') }}
+            onClick={() => { onTagClick(''); onCollectionClick(''); onGoHome() }}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs
                         transition-colors text-left
                         ${!activeTag && !activeCollection
@@ -109,6 +110,18 @@ export function Sidebar({
           >
             <span className="text-sm leading-none">🧠</span>
             Wiki
+          </button>
+
+          <button
+            onClick={onOpenArchive}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs
+                        transition-colors text-left
+                        ${currentPage === 'archive'
+                          ? 'bg-brand/10 text-brand-bright'
+                          : 'text-ink-3 hover:text-ink-2 hover:bg-surface-3'}`}
+          >
+            <span className="text-sm leading-none">📦</span>
+            Archive
           </button>
         </div>
 
@@ -227,7 +240,7 @@ export function Sidebar({
             {tags.slice(0, 10).map(tag => (
               <button
                 key={tag.id}
-                onClick={() => onTagClick(tag.name === activeTag ? '' : tag.name)}
+                onClick={() => { onTagClick(tag.name === activeTag ? '' : tag.name); onGoHome() }}
                 className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs
                             transition-colors text-left
                             ${activeTag === tag.name
