@@ -11,6 +11,7 @@ import { SearchModal }             from '../components/SearchModal'
 import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
 import { ArchivePage }             from './ArchivePage'
+import { BulkActionBar }           from '../components/BulkActionBar'
 import { TopicPage }               from './TopicPage'
 
 interface Props {
@@ -42,6 +43,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const [topics,           setTopics]           = useState<any[]>([])
   const [selectedId,       setSelectedId]       = useState<string | null>(null)
   const [showSearch,       setShowSearch]       = useState(false)
+  const [selectedIds,      setSelectedIds]      = useState<string[]>([])
   const [debouncedSearch,  setDebouncedSearch]  = useState('')
 
   useEffect(() => {
@@ -51,6 +53,8 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
 
   useEffect(() => {
     if (page.type === 'home') fetchBookmarks()
+    // Clear selection when navigating away
+    setSelectedIds([])
   }, [debouncedSearch, activeTag, activeCollection, page])
 
   useEffect(() => { fetchTags(); fetchCollections(); fetchTopics() }, [])
@@ -104,6 +108,40 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   async function handleArchive(id: string) {
     setBookmarks(prev => prev.filter(b => b.id !== id))
     await bookmarksApi.archive(id)
+    fetchTags()
+  }
+  // ── Bulk action handlers ──
+  function toggleSelect(id: string) {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  async function handleBulkDelete(ids: string[]) {
+    setBookmarks(prev => prev.filter(b => !ids.includes(b.id)))
+    await Promise.all(ids.map(id => bookmarksApi.delete(id)))
+    setSelectedIds([])
+    fetchTags()
+    fetchCollections()
+  }
+
+  async function handleBulkArchive(ids: string[]) {
+    setBookmarks(prev => prev.filter(b => !ids.includes(b.id)))
+    await Promise.all(ids.map(id => bookmarksApi.archive(id)))
+    setSelectedIds([])
+  }
+
+  async function handleBulkAddToCollection(ids: string[], collectionId: string) {
+    await Promise.all(ids.map(id => collectionsApi.addBookmark(collectionId, id)))
+    setSelectedIds([])
+    fetchCollections()
+  }
+
+  async function handleBulkTag(ids: string[], tag: string) {
+    await Promise.all(ids.map(id =>
+      bookmarksApi.update(id, { tags: [tag] })
+    ))
+    setSelectedIds([])
     fetchTags()
   }
 
@@ -322,6 +360,8 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                     key={b.id}
                     bookmark={b}
                     collections={collections}
+                    isSelected={selectedIds.includes(b.id)}
+                    onToggleSelect={toggleSelect}
                     onDelete={handleDelete}
                     onTagClick={handleTagClick}
                     onOpenModal={b => setPage({ type: 'bookmark-detail', bookmarkId: b.id })}
@@ -347,6 +387,17 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
           </main>
         </div>
       )}
+
+      <BulkActionBar
+        selectedIds={selectedIds}
+        collections={collections}
+        onClear={() => setSelectedIds([])}
+        onDelete={handleBulkDelete}
+        onArchive={handleBulkArchive}
+        onAddToCollection={handleBulkAddToCollection}
+        onAddTag={handleBulkTag}
+      />
+
 
       {showSearch && (
         <SearchModal

@@ -20,6 +20,9 @@ export function CollectionDetailPage({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailId,   setDetailId]   = useState<string | null>(null)
   const [view,       setView]       = useState<'grid' | 'list'>('grid')
+  const [sharing,    setSharing]    = useState(false)
+  const [shareUrl,   setShareUrl]   = useState<string | null>(null)
+  const [copied,     setCopied]     = useState(false)
 
   useEffect(() => {
     fetchCollection()
@@ -30,6 +33,33 @@ export function CollectionDetailPage({
     const result = await collectionsApi.getOne(collectionId)
     if (!result.error) setCollection(result.data.collection)
     setLoading(false)
+  }
+
+  async function handleTogglePublic() {
+    if (!collection) return
+    setSharing(true)
+    const r = await collectionsApi.update(collection.id, { isPublic: !collection.isPublic })
+    if (!r.error) {
+      const newIsPublic = !collection.isPublic
+      setCollection((prev: any) => prev ? { ...prev, isPublic: newIsPublic } : prev)
+      if (newIsPublic) {
+        const meRes = await fetch('http://localhost:3001/api/auth/me', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
+        })
+        const meData = await meRes.json().catch(() => null)
+        const username = meData?.data?.user?.username ?? 'user'
+        // Get slug from updated collection
+        const updated = await collectionsApi.getOne(collection.id)
+        if (!updated.error) {
+          const slug = updated.data.collection.slug
+          setCollection((prev: any) => prev ? { ...prev, slug } : prev)
+          setShareUrl(`${window.location.origin}/p/${username}/collection/${slug}`)
+        }
+      } else {
+        setShareUrl(null)
+      }
+    }
+    setSharing(false)
   }
 
   async function handleDelete(bookmarkId: string) {

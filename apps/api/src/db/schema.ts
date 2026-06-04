@@ -243,3 +243,22 @@ export const topicConnectionsRelations = relations(topicConnections, ({ one }) =
   fromTopic: one(topics, { fields: [topicConnections.fromTopicId], references: [topics.id], relationName: 'fromTopic' }),
   toTopic:   one(topics, { fields: [topicConnections.toTopicId],   references: [topics.id], relationName: 'toTopic' }),
 }))
+
+// ─────────────────────────────────────────────
+// READING LIST
+// ─────────────────────────────────────────────
+export const readingList = pgTable('reading_list', {
+  id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  bookmarkId: uuid('bookmark_id').notNull().references(() => bookmarks.id, { onDelete: 'cascade' }),
+  isRead:     boolean('is_read').default(false),
+  addedAt:    timestamp('added_at', { withTimezone: true }).defaultNow(),
+  readAt:     timestamp('read_at', { withTimezone: true }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.bookmarkId] }),
+}))
+
+export const readingListRelations = relations(readingList, ({ one }) => ({
+  user:     one(users,     { fields: [readingList.userId],     references: [users.id] }),
+  bookmark: one(bookmarks, { fields: [readingList.bookmarkId], references: [bookmarks.id] }),
+}))

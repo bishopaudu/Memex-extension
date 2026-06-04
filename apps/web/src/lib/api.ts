@@ -181,3 +181,24 @@ export const graphApi = {
     }>('/api/topics/graph')
   },
 }
+
+export const readingApi = {
+  async list(filter: 'unread' | 'read' | 'all' = 'unread') {
+    return apiFetch<{ items: any[] }>(`/api/reading?filter=${filter}`)
+  },
+  async add(bookmarkId: string) {
+    return apiFetch('/api/reading', {
+      method: 'POST',
+      body:   JSON.stringify({ bookmarkId }),
+    })
+  },
+  async markRead(bookmarkId: string, isRead: boolean) {
+    return apiFetch(`/api/reading/${bookmarkId}`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ isRead }),
+    })
+  },
+  async remove(bookmarkId: string) {
+    return apiFetch(`/api/reading/${bookmarkId}`, { method: 'DELETE' })
+  },
+}
