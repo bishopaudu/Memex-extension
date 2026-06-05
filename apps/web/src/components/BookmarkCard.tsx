@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { collectionsApi } from '../lib/api'
+import { collectionsApi , readingApi } from '../lib/api'
 
 interface Attachment {
   id:      string
@@ -31,13 +31,15 @@ interface Props {
   isSelected?:         boolean
   onToggleSelect?:     (id: string) => void
   onDelete:            (id: string) => void
+  onArchive?:          (id: string) => void
+  onAddToReading?:     (id: string) => void
   onTagClick:          (tag: string) => void
   onOpenModal:         (bookmark: Bookmark) => void
   onCollectionsChange: () => void
 }
 
 export function BookmarkCard({
-  bookmark, collections, onDelete,
+  bookmark, collections, onDelete, onArchive, onAddToReading,
   onTagClick, onOpenModal, onCollectionsChange,
   isSelected = false, onToggleSelect,
 }: Props) {
@@ -296,6 +298,45 @@ export function BookmarkCard({
                 <line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
             </a>
+
+            {/* Add to reading list */}
+            {onAddToReading && (
+              <button
+                onClick={async e => {
+                  e.stopPropagation()
+                  await readingApi.add(bookmark.id)
+                  onAddToReading(bookmark.id)
+                }}
+                className="w-5 h-5 flex items-center justify-center rounded
+                           bg-surface-3 text-ink-3 hover:text-brand-bright
+                           hover:bg-brand/10 transition-colors"
+                title="Save to reading list"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" strokeWidth={2}>
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+              </button>
+            )}
+
+            {/* Archive */}
+            {onArchive && (
+              <button
+                onClick={e => { e.stopPropagation(); onArchive(bookmark.id) }}
+                className="w-5 h-5 flex items-center justify-center rounded
+                           bg-surface-3 text-ink-3 hover:text-amber-400
+                           hover:bg-amber-400/10 transition-colors"
+                title="Archive"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" strokeWidth={2}>
+                  <polyline points="21 8 21 21 3 21 3 8"/>
+                  <rect x="1" y="3" width="22" height="5"/>
+                  <line x1="10" y1="12" x2="14" y2="12"/>
+                </svg>
+              </button>
+            )}
 
             {/* Delete */}
             <button

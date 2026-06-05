@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { collectionsApi } from '../lib/api'
+import { collectionsApi, digestApi } from '../lib/api'
 
 interface Tag        { id: string; name: string; count: number }
 interface Collection { id: string; name: string; color: string; icon: string; count: number }
@@ -10,13 +10,14 @@ interface Props {
   activeTag:     string
   activeCollection: string
   bookmarkCount: number
-  currentPage:   'home' | 'collections' | 'wiki' | 'archive' | 'archive'
+  currentPage:   'home' | 'collections' | 'wiki' | 'archive' | 'reading' 
   onTagClick:       (tag: string) => void
   onCollectionClick: (id: string) => void
   onCollectionsChange: () => void
   onOpenCollectionsPage: () => void
   onOpenWikiPage:   () => void
   onOpenArchive:    () => void
+  onOpenReadingList: () => void
   onGoHome:         () => void
   userEmail: string
   onLogout: () => void
@@ -27,7 +28,7 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
   bookmarkCount, currentPage, onTagClick, onCollectionClick,
-  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onGoHome,
+  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onOpenReadingList, onGoHome,
   userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
@@ -35,6 +36,8 @@ export function Sidebar({
   const [newColor,   setNewColor]   = useState(COLORS[0])
   const [newIcon,    setNewIcon]    = useState('📁')
   const [saving,     setSaving]     = useState(false)
+  const [sendingDigest, setSendingDigest] = useState(false)
+  const [digestSent,    setDigestSent]    = useState(false)
 
   async function handleCreate() {
     if (!newName.trim()) return
@@ -122,6 +125,18 @@ export function Sidebar({
           >
             <span className="text-sm leading-none">📦</span>
             Archive
+          </button>
+
+          <button
+            onClick={onOpenReadingList}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs
+                        transition-colors text-left
+                        ${currentPage === 'reading'
+                          ? 'bg-brand/10 text-brand-bright'
+                          : 'text-ink-3 hover:text-ink-2 hover:bg-surface-3'}`}
+          >
+            <span className="text-sm leading-none">📖</span>
+            Reading list
           </button>
         </div>
 
@@ -263,6 +278,22 @@ export function Sidebar({
           {initial}
         </div>
         <span className="text-[11px] text-ink-3 truncate flex-1">{userEmail}</span>
+        <button
+          onClick={async () => {
+            setSendingDigest(true)
+            await digestApi.sendDigest()
+            setSendingDigest(false)
+            setDigestSent(true)
+            setTimeout(() => setDigestSent(false), 3000)
+          }}
+          disabled={sendingDigest}
+          className="text-[10px] text-ink-4 hover:text-ink-2 transition-colors
+                     flex-shrink-0 mr-1"
+          title="Send weekly digest email"
+        >
+          {digestSent ? '✓' : sendingDigest ? '...' : '📧'}
+        </button>
+
         <button
           onClick={onLogout}
           className="text-[10px] text-ink-4 hover:text-ink-2 transition-colors flex-shrink-0"

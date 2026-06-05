@@ -3,6 +3,8 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["webextension-polyfill"]
+
   }
 }

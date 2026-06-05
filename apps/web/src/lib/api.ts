@@ -202,3 +202,12 @@ export const readingApi = {
     return apiFetch(`/api/reading/${bookmarkId}`, { method: 'DELETE' })
   },
 }
+
+export const digestApi = {
+  async sendDigest() {
+    return apiFetch<{ sent: boolean; to: string; bookmarks: number }>(
+      '/api/digest/send',
+      { method: 'POST' }
+    )
+  },
+}

@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm'
 export const users = pgTable('users', {
   id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   email:      text('email').unique().notNull(),
+  username:   text('username').unique(),
   name:       text('name'),
   avatarUrl:  text('avatar_url'),
   password:   text('password').notNull(), // bcrypt hash, never plaintext
@@ -111,6 +112,7 @@ export const collections = pgTable('collections', {
   color:       text('color').default('#4f6ef7'),
   icon:        text('icon').default('📁'),
   isPublic:    boolean('is_public').default(false),
+  slug:        text('slug'),
   createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
@@ -173,6 +175,7 @@ export const topics = pgTable('topics', {
   summary:     text('summary'),           // short 1-2 sentence description
   isPublic:    boolean('is_public').default(false),
   coverColor:  text('cover_color').default('#4f6ef7'),
+  slug:        text('slug'),
   createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
@@ -248,7 +251,6 @@ export const topicConnectionsRelations = relations(topicConnections, ({ one }) =
 // READING LIST
 // ─────────────────────────────────────────────
 export const readingList = pgTable('reading_list', {
-  id:         uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   bookmarkId: uuid('bookmark_id').notNull().references(() => bookmarks.id, { onDelete: 'cascade' }),
   isRead:     boolean('is_read').default(false),

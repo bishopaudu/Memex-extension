@@ -12,6 +12,8 @@ import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
 import { ArchivePage }             from './ArchivePage'
 import { BulkActionBar }           from '../components/BulkActionBar'
+import { ReadingListPage }         from './ReadingListPage'
+import { DailyRediscovery }        from '../components/DailyRediscovery'
 import { TopicPage }               from './TopicPage'
 
 interface Props {
@@ -26,6 +28,7 @@ type Page =
   | { type: 'wiki' }
   | { type: 'topic'; topicId: string }
   | { type: 'archive' }
+  | { type: 'reading' }
   | { type: 'bookmark-detail'; bookmarkId: string }
 
 export function DashboardPage({ theme, toggleTheme }: Props) {
@@ -159,13 +162,15 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const user = auth.status === 'authenticated' ? auth.user : null
 
   // Sidebar current page indicator
-  const sidebarPage: 'home' | 'collections' | 'wiki' | 'archive' =
+  const sidebarPage: 'home' | 'collections' | 'wiki' | 'archive' | 'reading' =
     page.type === 'collections' || page.type === 'collection-detail'
       ? 'collections'
     : page.type === 'wiki'    || page.type === 'topic'
       ? 'wiki'
     : page.type === 'archive'
       ? 'archive'
+    : page.type === 'reading'
+      ? 'reading'
     : 'home'
 
   return (
@@ -183,6 +188,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
         onOpenCollectionsPage={() => setPage({ type: 'collections' })}
         onOpenWikiPage={() => setPage({ type: 'wiki' })}
         onOpenArchive={() => setPage({ type: 'archive' })}
+        onOpenReadingList={() => setPage({ type: 'reading' })}
         onGoHome={() => {
           setPage({ type: 'home' })
           setActiveCollection('')
@@ -241,6 +247,13 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
       {/* ── ARCHIVE PAGE ── */}
       {page.type === 'archive' && (
         <ArchivePage
+          onOpenBookmark={id => setPage({ type: 'bookmark-detail', bookmarkId: id })}
+        />
+      )}
+
+      {/* ── READING LIST PAGE ── */}
+      {page.type === 'reading' && (
+        <ReadingListPage
           onOpenBookmark={id => setPage({ type: 'bookmark-detail', bookmarkId: id })}
         />
       )}
@@ -320,6 +333,13 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
               </div>
             )}
 
+            {/* Daily rediscovery — shown once per day */}
+            {!activeTag && !debouncedSearch && (
+              <DailyRediscovery
+                onOpenBookmark={id => setPage({ type: 'bookmark-detail', bookmarkId: id })}
+              />
+            )}
+
             {!loading && (
               <p className="text-[11px] text-ink-4 mb-4">
                 {bookmarks.length} {bookmarks.length === 1 ? 'bookmark' : 'bookmarks'}
@@ -363,6 +383,8 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                     isSelected={selectedIds.includes(b.id)}
                     onToggleSelect={toggleSelect}
                     onDelete={handleDelete}
+                    onArchive={handleArchive}
+                    onAddToReading={() => {}}
                     onTagClick={handleTagClick}
                     onOpenModal={b => setPage({ type: 'bookmark-detail', bookmarkId: b.id })}
                     onCollectionsChange={() => { fetchCollections(); fetchBookmarks() }}

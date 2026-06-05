@@ -111,18 +111,29 @@ export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }:
   }
 
   async function copyUrl() {
-    await navigator.clipboard.writeText(bookmark.url).catch(() => {})
+    await navigator.clipboard.writeText(bookmark!.url).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+ /* const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'overview',    label: 'Overview',    count: 0 },
     { key: 'screenshots', label: 'Screenshots', count: screenshots.length },
     { key: 'images',      label: 'Images',      count: extractedImages.length },
     { key: 'notes',       label: 'Notes',       count: textNotes.length + textExtract.length },
     { key: 'links',       label: 'Links',       count: extractedLinks.length },
-  ].filter(t => t.key === 'overview' || t.count > 0)
+  ].filter(t => t.key === 'overview' || t.count > 0)*/
+  const allTabs: { key: Tab; label: string; count: number }[] = [
+  { key: 'overview',    label: 'Overview',    count: 0 },
+  { key: 'screenshots', label: 'Screenshots', count: screenshots.length },
+  { key: 'images',      label: 'Images',      count: extractedImages.length },
+  { key: 'notes',       label: 'Notes',       count: textNotes.length + textExtract.length },
+  { key: 'links',       label: 'Links',       count: extractedLinks.length },
+]
+
+const tabs = allTabs.filter(
+  t => t.key === 'overview' || t.count > 0
+)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-1">
