@@ -1,4 +1,306 @@
 import { Hono } from 'hono'
+import {
+  db, users, topics, topicBlocks, topicReferences,
+  topicConnections, collections, bookmarkCollections,
+  bookmarks, bookmarkTags, tags,
+} from '../db'
+import { eq, and, inArray } from 'drizzle-orm'
+
+export const publicRouter = new Hono()
+
+// ─────────────────────────────────────────────
+// Slug generator
+// ─────────────────────────────────────────────
+export function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 60)
+    .replace(/^-|-$/g, '')
+    || 'untitled'
+}
+
+// ─────────────────────────────────────────────
+// GET /p/:username/topic/:slug — public topic
+// ─────────────────────────────────────────────
+publicRouter.get('/:username/topic/:slug', async (c) => {
+  const username = c.req.param('username').toLowerCase()
+  const slug     = c.req.param('slug')
+
+  try {
+    // 1. Find user
+    const user = await db.query.users.findFirst({
+      where: eq(users.username, username),
+    })
+
+    if (!user) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+    }
+
+    // 2. Find topic
+    const topic = await db.query.topics.findFirst({
+      where: and(
+        eq(topics.userId,   user.id),
+        eq(topics.slug,     slug),
+        eq(topics.isPublic, true),
+      ),
+    })
+
+    if (!topic) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
+    }
+
+    // 3. Blocks
+    const blocks = await db
+      .select()
+      .from(topicBlocks)
+      .where(eq(topicBlocks.topicId, topic.id))
+      .orderBy(topicBlocks.order)
+
+    // 4. References
+    const refs = await db
+      .select()
+      .from(topicReferences)
+      .where(eq(topicReferences.topicId, topic.id))
+
+    // 5. Bookmark data for each reference
+    const bookmarkIds = refs.map(r => r.bookmarkId)
+    const refBookmarks = bookmarkIds.length > 0
+      ? await db.query.bookmarks.findMany({
+          where: inArray(bookmarks.id, bookmarkIds),
+          with:  { bookmarkTags: { with: { tag: true } } },
+        })
+      : []
+
+    const bmMap = Object.fromEntries(refBookmarks.map(b => [b.id, b]))
+
+    // 6. Connections to other public topics
+    const conns = await db
+      .select({
+        toTopicId: topicConnections.toTopicId,
+        label:     topicConnections.label,
+      })
+      .from(topicConnections)
+      .where(eq(topicConnections.fromTopicId, topic.id))
+
+    const connTopicIds = conns.map(c => c.toTopicId)
+    const connTopics = connTopicIds.length > 0
+      ? await db
+          .select({
+            id:       topics.id,
+            title:    topics.title,
+            emoji:    topics.emoji,
+            slug:     topics.slug,
+            isPublic: topics.isPublic,
+          })
+          .from(topics)
+          .where(inArray(topics.id, connTopicIds))
+      : []
+
+    const connMap = Object.fromEntries(connTopics.map(t => [t.id, t]))
+
+    return c.json({
+      data: {
+        author: {
+          username: user.username,
+          name:     user.name,
+        },
+        topic: {
+          id:         topic.id,
+          title:      topic.title,
+          emoji:      topic.emoji,
+          summary:    topic.summary,
+          coverColor: topic.coverColor,
+          slug:       topic.slug,
+          updatedAt:  topic.updatedAt,
+          blocks: blocks.map(b => ({
+            id:       b.id,
+            type:     b.type,
+            content:  b.content,
+            metadata: b.metadata,
+            order:    b.order,
+          })),
+          references: refs.map(r => {
+            const bm = bmMap[r.bookmarkId]
+            if (!bm) return null
+            return {
+              bookmarkId: r.bookmarkId,
+              note:       r.note,
+              bookmark: {
+                id:          bm.id,
+                url:         bm.url,
+                title:       bm.title,
+                description: bm.description,
+                faviconUrl:  bm.faviconUrl,
+                tags:        bm.bookmarkTags.map(bt => bt.tag),
+              },
+            }
+          }).filter(Boolean),
+          connections: conns
+            .map(conn => {
+              const t = connMap[conn.toTopicId]
+              if (!t || !t.isPublic || !t.slug) return null
+              return {
+                topicId: t.id,
+                title:   t.title,
+                emoji:   t.emoji,
+                slug:    t.slug,
+                label:   conn.label,
+              }
+            })
+            .filter(Boolean),
+        },
+      },
+      error: null,
+    })
+  } catch (err) {
+    console.error('[Public topic] Error:', err)
+    return c.json({
+      data:  null,
+      error: { code: 'SERVER_ERROR', message: 'Something went wrong' },
+    }, 500)
+  }
+})
+
+// ─────────────────────────────────────────────
+// GET /p/:username/collection/:slug
+// ─────────────────────────────────────────────
+publicRouter.get('/:username/collection/:slug', async (c) => {
+  const username = c.req.param('username').toLowerCase()
+  const slug     = c.req.param('slug')
+
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.username, username),
+    })
+
+    if (!user) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+    }
+
+    const collection = await db.query.collections.findFirst({
+      where: and(
+        eq(collections.userId,   user.id),
+        eq(collections.slug,     slug),
+        eq(collections.isPublic, true),
+      ),
+    })
+
+    if (!collection) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Collection not found' } }, 404)
+    }
+
+    // Get bookmark IDs in this collection
+    const bcRows = await db
+      .select({ bookmarkId: bookmarkCollections.bookmarkId })
+      .from(bookmarkCollections)
+      .where(eq(bookmarkCollections.collectionId, collection.id))
+
+    const bookmarkIds = bcRows.map(r => r.bookmarkId)
+
+    const bookmarkItems = bookmarkIds.length > 0
+      ? await db.query.bookmarks.findMany({
+          where: inArray(bookmarks.id, bookmarkIds),
+          with:  { bookmarkTags: { with: { tag: true } } },
+        })
+      : []
+
+    return c.json({
+      data: {
+        author: { username: user.username, name: user.name },
+        collection: {
+          id:          collection.id,
+          name:        collection.name,
+          icon:        collection.icon,
+          color:       collection.color,
+          description: collection.description,
+          slug:        collection.slug,
+        },
+        bookmarks: bookmarkItems.map(b => ({
+          id:          b.id,
+          url:         b.url,
+          title:       b.title,
+          description: b.description,
+          faviconUrl:  b.faviconUrl,
+          ogImageUrl:  b.ogImageUrl,
+          tags:        b.bookmarkTags.map(bt => bt.tag),
+          createdAt:   b.createdAt,
+        })),
+      },
+      error: null,
+    })
+  } catch (err) {
+    console.error('[Public collection] Error:', err)
+    return c.json({
+      data:  null,
+      error: { code: 'SERVER_ERROR', message: 'Something went wrong' },
+    }, 500)
+  }
+})
+
+// ─────────────────────────────────────────────
+// GET /p/:username — public profile
+// ─────────────────────────────────────────────
+publicRouter.get('/:username', async (c) => {
+  const username = c.req.param('username').toLowerCase()
+
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.username, username),
+    })
+
+    if (!user) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+    }
+
+    const publicTopics = await db
+      .select({
+        id:         topics.id,
+        title:      topics.title,
+        emoji:      topics.emoji,
+        summary:    topics.summary,
+        coverColor: topics.coverColor,
+        slug:       topics.slug,
+        updatedAt:  topics.updatedAt,
+      })
+      .from(topics)
+      .where(and(eq(topics.userId, user.id), eq(topics.isPublic, true)))
+
+    const publicCollections = await db
+      .select({
+        id:          collections.id,
+        name:        collections.name,
+        icon:        collections.icon,
+        color:       collections.color,
+        description: collections.description,
+        slug:        collections.slug,
+      })
+      .from(collections)
+      .where(and(eq(collections.userId, user.id), eq(collections.isPublic, true)))
+
+    return c.json({
+      data: {
+        user:        { username: user.username, name: user.name },
+        topics:      publicTopics,
+        collections: publicCollections,
+      },
+      error: null,
+    })
+  } catch (err) {
+    console.error('[Public profile] Error:', err)
+    return c.json({
+      data:  null,
+      error: { code: 'SERVER_ERROR', message: 'Something went wrong' },
+    }, 500)
+  }
+})
+
+export default publicRouter
+
+
+/*import { Hono } from 'hono'
 import { sql } from 'drizzle-orm'
 import { db } from '../db'
 
@@ -115,4 +417,4 @@ publicRouter.get('/:username', async (c) => {
   }
 })
 
-export default publicRouter
+export default publicRouter*/

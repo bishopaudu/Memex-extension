@@ -211,3 +211,18 @@ export const digestApi = {
     )
   },
 }
+export const publicApi = {
+  async getTopic(username: string, slug: string) {
+    return apiFetch<{ author: any; topic: any }>(`/p/${username}/topic/${slug}`)
+  },
+
+  async getCollection(username: string, slug: string) {
+    return apiFetch<{ author: any; collection: any; bookmarks: any[] }>(
+      `/p/${username}/collection/${slug}`
+    )
+  },
+
+  async getProfile(username: string) {
+    return apiFetch<{ user: any; topics: any[]; collections: any[] }>(`/p/${username}`)
+  },
+}

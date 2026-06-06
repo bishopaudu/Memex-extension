@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db, collections, bookmarkCollections, bookmarks, bookmarkTags, tags, attachments } from '../db'
 import { eq, and, desc, sql, inArray } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
+import { generateSlug } from './public'
 
 const collectionsRouter = new Hono<{
   Variables: { userId: string; userEmail: string }
@@ -260,6 +261,45 @@ collectionsRouter.delete('/:id/bookmarks/:bookmarkId', async (c) => {
     )
 
   return c.json({ data: { success: true }, error: null })
+})
+
+collectionsRouter.patch('/:id', async (c) => {
+  const userId = c.get('userId')
+  const id     = c.req.param('id')
+  const input  = await c.req.json()
+
+  const [existing] = await db
+    .select({ id: collections.id, name: collections.name, slug: collections.slug })
+    .from(collections)
+    .where(and(eq(collections.id, id), eq(collections.userId, userId)))
+    .limit(1)
+
+  if (!existing) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Collection not found' } }, 404)
+  }
+
+  const updates: any = { updatedAt: new Date() }
+  if (input.name        !== undefined) updates.name        = input.name
+  if (input.description !== undefined) updates.description = input.description
+  if (input.color       !== undefined) updates.color       = input.color
+  if (input.icon        !== undefined) updates.icon        = input.icon
+  if (input.isPublic    !== undefined) {
+    updates.isPublic = input.isPublic
+    // Generate slug when making public
+    if (input.isPublic && !existing.slug) {
+      updates.slug = generateSlug(existing.name)
+    }
+  }
+
+  await db.update(collections).set(updates).where(eq(collections.id, id))
+
+  const [updated] = await db
+    .select({ slug: collections.slug, isPublic: collections.isPublic })
+    .from(collections)
+    .where(eq(collections.id, id))
+    .limit(1)
+
+  return c.json({ data: { success: true, slug: updated?.slug, isPublic: updated?.isPublic }, error: null })
 })
 
 export default collectionsRouter

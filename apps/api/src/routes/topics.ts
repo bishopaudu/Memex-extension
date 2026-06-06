@@ -7,6 +7,7 @@ import {
 } from '../db'
 import { eq, and, desc, inArray, sql } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
+import { generateSlug }   from './public'
 
 const topicsRouter = new Hono<{
   Variables: { userId: string; userEmail: string }
@@ -228,13 +229,51 @@ topicsRouter.patch('/:id', zValidator('json', z.object({
       error: { code: 'NOT_FOUND', message: 'Topic not found' }
     }, 404)
   }
+    // ← INSERT HERE ↓
+  /*const updateData: Record<string, any> = { ...input, updatedAt: new Date() }
+  if (input.isPublic === true) {
+    const [full] = await db
+      .select({ slug: topics.slug, title: topics.title })
+      .from(topics)
+      .where(eq(topics.id, id))
+      .limit(1)
+    if (!full.slug) {
+      updateData.slug = full.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') + '-' + id.slice(0, 6)
+    }
+  } */
+  // ← INSERT ENDS ↑
+
+  const updates: any = { ...input, updatedAt: new Date() }
+
+  if (input.isPublic) {
+    const [current] = await db
+      .select({ slug: topics.slug, title: topics.title })
+      .from(topics)
+      .where(eq(topics.id, id))
+      .limit(1)
+
+    if (!current?.slug) {
+      updates.slug = generateSlug(current?.title ?? id)
+    }
+  }
 
   await db
     .update(topics)
-    .set({ ...input, updatedAt: new Date() })
+    .set(updates)
+    //.set({ ...input, updatedAt: new Date() })
     .where(eq(topics.id, id))
 
-  return c.json({ data: { success: true }, error: null })
+ // return c.json({ data: { success: true }, error: null })
+ const [updated] = await db
+    .select({ slug: topics.slug, isPublic: topics.isPublic })
+    .from(topics)
+    .where(eq(topics.id, id))
+    .limit(1)
+
+  return c.json({ data: { success: true, slug: updated?.slug, isPublic: updated?.isPublic }, error: null })
 })
 
 // ─────────────────────────────────────────────

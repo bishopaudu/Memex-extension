@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { topicsApi, bookmarksApi } from '../lib/api'
+import { topicsApi, bookmarksApi, authApi } from '../lib/api'
 
 interface Block {
   id:       string
@@ -73,6 +73,9 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
   const [titleVal,     setTitleVal]     = useState('')
   const [showAddRef,   setShowAddRef]   = useState(false)
   const [showConnect,  setShowConnect]  = useState(false)
+  const [sharing,      setSharing]      = useState(false)
+  const [shareUrl,     setShareUrl]     = useState<string | null>(null)
+  const [copiedShare,  setCopiedShare]  = useState(false)
   const [allBookmarks, setAllBookmarks] = useState<any[]>([])
   const [blockMenu,    setBlockMenu]    = useState<string | null>(null)
   const [activeBlock,  setActiveBlock]  = useState<string | null>(null)
@@ -171,6 +174,56 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
     await topicsApi.removeReference(topicId, bookmarkId)
     fetchTopic()
   }
+
+  async function handleTogglePublic() {
+    if (!topic) return
+    setSharing(true)
+    const newIsPublic = !topic.isPublic
+
+    const r = await topicsApi.update(topic.id, { isPublic: newIsPublic })
+
+    if (!r.error) {
+      setTopic(prev => prev ? { ...prev, isPublic: newIsPublic } : prev)
+
+      if (newIsPublic) {
+        // The PATCH response returns slug directly
+        let slug = (r.data as any)?.slug
+
+        // If not in response, fetch the topic to get the slug
+        if (!slug) {
+          const updated = await topicsApi.getOne(topic.id)
+          if (!updated.error) {
+            slug = updated.data.topic.slug
+          }
+        }
+
+        if (slug) {
+          // Get real username from API
+          let username = 'user'
+          try {
+            const meRes = await authApi.me()
+            if (!meRes.error) {
+              username = meRes.data.user.username ?? meRes.data.user.email.split('@')[0]
+            }
+          } catch {}
+
+          setTopic(prev => prev ? { ...prev, slug, isPublic: newIsPublic } : prev)
+          setShareUrl(`${window.location.origin}/p/${username}/topic/${slug}`)
+        } else {
+          // slug still null — generate one client-side from title as fallback
+          const fallbackSlug = topic.title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .slice(0, 60)
+          setShareUrl(`${window.location.origin}/p/user/topic/${fallbackSlug}`)
+        }
+      } else {
+        setShareUrl(null)
+      }
+    }
+    setSharing(false)
+  }  
 
   async function connectTopic(toId: string) {
     await topicsApi.connect(topicId, toId)
@@ -467,9 +520,81 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
             </div>
           </div>
 
-          {/* Meta */}
+          {/* Share */}
           <div className="border-t border-surface-4 pt-4">
-            <p className="text-[10px] text-ink-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-medium text-ink-4 uppercase tracking-wider">
+                Sharing
+              </p>
+              <button
+                onClick={handleTogglePublic}
+                disabled={sharing}
+                className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0
+                            ${topic.isPublic ? 'bg-green-500' : 'bg-surface-5'}
+                            ${sharing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                title={topic.isPublic ? 'Make private' : 'Make public'}
+              >
+                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white
+                                 transition-transform shadow-sm
+                                 ${topic.isPublic ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+
+            {topic.isPublic ? (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10px] text-green-400 flex items-center gap-1">
+                  <span>●</span> Public — anyone with the link can view
+                </p>
+                {shareUrl ? (
+                  <div className="flex items-center gap-1 bg-surface-3 border
+                                  border-surface-4 rounded-lg overflow-hidden">
+                    <p className="text-[9px] text-ink-4 px-2 truncate flex-1 py-1.5">
+                      {shareUrl.replace('http://localhost:5173', '')}
+                    </p>
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(shareUrl)
+                        setCopiedShare(true)
+                        setTimeout(() => setCopiedShare(false), 2000)
+                      }}
+                      className="px-2 py-1.5 text-[9px] bg-surface-4 hover:bg-surface-5
+                                 text-ink-3 hover:text-ink-1 transition-colors flex-shrink-0
+                                 border-l border-surface-4"
+                    >
+                      {copiedShare ? '✓' : 'Copy'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const updated = await topicsApi.getOne(topicId)
+                      if (!updated.error) {
+                        const slug = updated.data.topic.slug
+                        try {
+                          const meRes = await fetch('http://localhost:3001/api/auth/me', {
+                            headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
+                          })
+                          const meData = await meRes.json()
+                          const username = meData?.data?.user?.username ?? 'user'
+                          setShareUrl(`${window.location.origin}/p/${username}/topic/${slug}`)
+                        } catch {
+                          setShareUrl(`${window.location.origin}/p/user/topic/${slug}`)
+                        }
+                      }
+                    }}
+                    className="text-[9px] text-brand-bright hover:underline"
+                  >
+                    Get share link →
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] text-ink-5">
+                Toggle to make this topic publicly viewable
+              </p>
+            )}
+
+            <p className="text-[10px] text-ink-5 mt-3">
               Updated {new Date(topic.updatedAt).toLocaleDateString('en-US', {
                 month: 'short', day: 'numeric', year: 'numeric'
               })}
