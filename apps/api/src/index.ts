@@ -11,6 +11,9 @@ import collectionsRouter from './routes/collections'
 import topicsRouter      from './routes/topics'
 import searchRouter      from './routes/search'
 import attachmentsRouter from './routes/attachments'
+import publicRouter      from './routes/public'
+import readingRouter     from './routes/reading'
+import digestRouter      from './routes/digest'
 
 const app = new Hono()
 
@@ -37,6 +40,9 @@ app.route('/api/collections', collectionsRouter)
 app.route('/api/topics',      topicsRouter)
 app.route('/api/search',      searchRouter)
 app.route('/api/attachments', attachmentsRouter)
+app.route('/api/reading',     readingRouter)
+app.route('/api/digest',      digestRouter)
+app.route('/p',               publicRouter)
 
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
@@ -45,7 +51,10 @@ app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return c.json({ data: null, error: { code: 'HTTP_ERROR', message: err.message } }, err.status)
   }
-  return c.json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }, 500)
+  return c.json({
+    data:  null,
+    error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' }
+  }, 500)
 })
 
 app.notFound((c) =>

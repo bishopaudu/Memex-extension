@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { db, readingList, bookmarks, bookmarkTags, tags, attachments } from '../db'
-import { eq, and, inArray } from 'drizzle-orm'
+import { db, readingList, bookmarks } from '../db'
+import { eq, and } from 'drizzle-orm'
 import { authMiddleware } from '../middleware/auth'
 
 const readingRouter = new Hono<{
@@ -9,32 +9,30 @@ const readingRouter = new Hono<{
 
 readingRouter.use('*', authMiddleware)
 
-// GET /reading — list reading list
 readingRouter.get('/', async (c) => {
-  const userId  = c.get('userId')
-  const filter  = c.req.query('filter') ?? 'unread' // unread | read | all
+  const userId = c.get('userId')
+  const filter = c.req.query('filter') ?? 'unread'
+
+  const conditions = [eq(readingList.userId, userId)]
+  if (filter === 'unread') conditions.push(eq(readingList.isRead, false))
+  if (filter === 'read')   conditions.push(eq(readingList.isRead, true))
 
   const items = await db.query.readingList.findMany({
-    where: and(
-      eq(readingList.userId, userId),
-      filter === 'unread' ? eq(readingList.isRead, false)
-      : filter === 'read' ? eq(readingList.isRead, true)
-      : undefined,
-    ),
-    with: { bookmark: { with: { bookmarkTags: { with: { tag: true } } } } },
+    where: and(...conditions),
+    with:  { bookmark: { with: { bookmarkTags: { with: { tag: true } } } } },
     orderBy: (rl, { desc }) => [desc(rl.addedAt)],
   })
 
   return c.json({
     data: {
       items: items.map(item => ({
-        id:       item.id,
-        isRead:   item.isRead,
-        addedAt:  item.addedAt,
-        readAt:   item.readAt,
+        id:      `${item.userId}-${item.bookmarkId}`,
+        isRead:  item.isRead,
+        addedAt: item.addedAt,
+        readAt:  item.readAt,
         bookmark: {
           ...item.bookmark,
-          tags: item.bookmark.bookmarkTags.map(bt => bt.tag),
+          tags: item.bookmark.bookmarkTags.map((bt: any) => bt.tag),
         },
       }))
     },
@@ -42,9 +40,8 @@ readingRouter.get('/', async (c) => {
   })
 })
 
-// POST /reading — add bookmark to reading list
 readingRouter.post('/', async (c) => {
-  const userId = c.get('userId')
+  const userId         = c.get('userId')
   const { bookmarkId } = await c.req.json()
 
   await db.insert(readingList)
@@ -54,17 +51,13 @@ readingRouter.post('/', async (c) => {
   return c.json({ data: { success: true }, error: null }, 201)
 })
 
-// PATCH /reading/:bookmarkId — mark as read/unread
 readingRouter.patch('/:bookmarkId', async (c) => {
   const userId     = c.get('userId')
   const bookmarkId = c.req.param('bookmarkId')
   const { isRead } = await c.req.json()
 
   await db.update(readingList)
-    .set({
-      isRead,
-      readAt: isRead ? new Date() : null,
-    })
+    .set({ isRead, readAt: isRead ? new Date() : null })
     .where(and(
       eq(readingList.userId,     userId),
       eq(readingList.bookmarkId, bookmarkId),
@@ -73,7 +66,6 @@ readingRouter.patch('/:bookmarkId', async (c) => {
   return c.json({ data: { success: true }, error: null })
 })
 
-// DELETE /reading/:bookmarkId — remove from list
 readingRouter.delete('/:bookmarkId', async (c) => {
   const userId     = c.get('userId')
   const bookmarkId = c.req.param('bookmarkId')

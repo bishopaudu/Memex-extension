@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { collectionsApi , readingApi } from '../lib/api'
+import { collectionsApi, readingApi } from '../lib/api'
+import { useToast } from './Toast'
 
 interface Attachment {
   id:      string
@@ -45,6 +46,7 @@ export function BookmarkCard({
 }: Props) {
   const [showCollMenu, setShowCollMenu] = useState(false)
   const [adding,       setAdding]       = useState(false)
+  const { toast } = useToast()
 
   const image  = bookmark.screenshotUrl ?? bookmark.ogImageUrl
   let   domain = ''
@@ -64,6 +66,8 @@ export function BookmarkCard({
     setAdding(false)
     setShowCollMenu(false)
     onCollectionsChange()
+    const col = collections.find(c => c.id === collectionId)
+    toast(`Added to ${col?.name ?? 'collection'}`, 'success', col?.icon ?? '📁')
   }
 
   // Attachment summary for the card strip
@@ -306,6 +310,7 @@ export function BookmarkCard({
                   e.stopPropagation()
                   await readingApi.add(bookmark.id)
                   onAddToReading(bookmark.id)
+                  toast('Added to reading list', 'success', '📖')
                 }}
                 className="w-5 h-5 flex items-center justify-center rounded
                            bg-surface-3 text-ink-3 hover:text-brand-bright
@@ -340,7 +345,11 @@ export function BookmarkCard({
 
             {/* Delete */}
             <button
-              onClick={e => { e.stopPropagation(); onDelete(bookmark.id) }}
+              onClick={e => {
+                e.stopPropagation()
+                onDelete(bookmark.id)
+                toast('Bookmark deleted', 'error', '🗑')
+              }}
               className="w-5 h-5 flex items-center justify-center rounded
                          bg-surface-3 text-ink-3 hover:text-red-400
                          hover:bg-red-400/10 transition-colors"

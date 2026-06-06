@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useToast } from './Toast'
 
 interface Props {
   selectedIds:   string[]
@@ -18,6 +19,7 @@ export function BulkActionBar({
   const [showTagInput,   setShowTagInput]   = useState(false)
   const [tagValue,       setTagValue]       = useState('')
   const [confirmDelete,  setConfirmDelete]  = useState(false)
+  const { toast } = useToast()
 
   if (selectedIds.length === 0) return null
 
