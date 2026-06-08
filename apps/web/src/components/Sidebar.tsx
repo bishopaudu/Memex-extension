@@ -19,6 +19,7 @@ interface Props {
   onOpenArchive:    () => void
   onOpenReadingList: () => void
   onGoHome:         () => void
+  onOpenProfile:      () => void
   userEmail: string
   onLogout: () => void
 }
@@ -28,7 +29,7 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
   bookmarkCount, currentPage, onTagClick, onCollectionClick,
-  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onOpenReadingList, onGoHome,
+  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onOpenReadingList, onGoHome, onOpenProfile,
   userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
@@ -273,11 +274,23 @@ export function Sidebar({
 
       {/* User footer */}
       <div className="p-3 border-t border-surface-4 flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center
-                        text-[10px] font-medium text-brand-bright flex-shrink-0">
+        <button
+          onClick={onOpenProfile}
+          className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center
+                     text-[10px] font-medium text-brand-bright flex-shrink-0
+                     hover:bg-brand/30 transition-colors"
+          title="View profile"
+        >
           {initial}
-        </div>
-        <span className="text-[11px] text-ink-3 truncate flex-1">{userEmail}</span>
+        </button>
+        <button
+          onClick={onOpenProfile}
+          className="text-[11px] text-ink-3 truncate flex-1 text-left
+                     hover:text-ink-1 transition-colors"
+          title="View profile"
+        >
+          {userEmail}
+        </button>
         <button
           onClick={async () => {
             setSendingDigest(true)

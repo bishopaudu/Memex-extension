@@ -226,3 +226,28 @@ export const publicApi = {
     return apiFetch<{ user: any; topics: any[]; collections: any[] }>(`/p/${username}`)
   },
 }
+export const profileApi = {
+  async getStats() {
+    return apiFetch<{
+      bookmarkCount:   number
+      topicCount:      number
+      collectionCount: number
+      tagCount:        number
+      archivedCount:   number
+    }>('/api/auth/stats')
+  },
+
+  async updateProfile(input: { name?: string; username?: string }) {
+    return apiFetch<{ user: any }>('/api/auth/profile', {
+      method: 'PATCH',
+      body:   JSON.stringify(input),
+    })
+  },
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return apiFetch<{ success: boolean }>('/api/auth/change-password', {
+      method: 'POST',
+      body:   JSON.stringify({ currentPassword, newPassword }),
+    })
+  },
+}

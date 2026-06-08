@@ -12,6 +12,7 @@ import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
 import { ArchivePage }             from './ArchivePage'
 import { BulkActionBar }           from '../components/BulkActionBar'
+import { ProfileModal }            from '../components/ProfileModal'
 import { ReadingListPage }         from './ReadingListPage'
 import { DailyRediscovery }        from '../components/DailyRediscovery'
 import { TopicPage }               from './TopicPage'
@@ -47,6 +48,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const [selectedId,       setSelectedId]       = useState<string | null>(null)
   const [showSearch,       setShowSearch]       = useState(false)
   const [selectedIds,      setSelectedIds]      = useState<string[]>([])
+  const [showProfile,      setShowProfile]      = useState(false)
   const [debouncedSearch,  setDebouncedSearch]  = useState('')
 
   useEffect(() => {
@@ -189,6 +191,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
         onOpenWikiPage={() => setPage({ type: 'wiki' })}
         onOpenArchive={() => setPage({ type: 'archive' })}
         onOpenReadingList={() => setPage({ type: 'reading' })}
+        onOpenProfile={() => setShowProfile(true)}
         onGoHome={() => {
           setPage({ type: 'home' })
           setActiveCollection('')
@@ -408,6 +411,18 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
             )}
           </main>
         </div>
+      )}
+
+      {/* Profile modal */}
+      {showProfile && auth.status === 'authenticated' && (
+        <ProfileModal
+          user={auth.user}
+          onClose={() => setShowProfile(false)}
+          onUpdate={(updatedUser) => {
+            // Update auth context if possible
+            setShowProfile(false)
+          }}
+        />
       )}
 
       <BulkActionBar

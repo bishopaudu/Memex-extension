@@ -3,11 +3,11 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
-import { db, users, sessions } from '../db'
-import { eq } from 'drizzle-orm'
+//import { db, users, sessions } from '../db'
+import { eq, sql ,and} from 'drizzle-orm'
 import { signToken } from '../lib/jwt'
 import { authMiddleware } from '../middleware/auth'
-
+import { db, users, sessions, bookmarks, topics, collections, tags } from '../db'
 const auth = new Hono()
 
 // ─────────────────────────────────────────────
@@ -161,6 +161,122 @@ auth.get('/me', authMiddleware, async (c) => {
   }
 
   return c.json({ data: { user }, error: null })
+})
+
+
+// ─────────────────────────────────────────────
+// GET /auth/stats — user's personal stats
+// ─────────────────────────────────────────────
+auth.get('/stats', authMiddleware, async (c) => {
+  const userId = c.get('userId')
+
+  const [
+    bookmarkCount,
+    topicCount,
+    collectionCount,
+    tagCount,
+    archivedCount,
+  ] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.isArchived, false)))
+      .then(r => r[0]?.count ?? 0),
+
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(topics)
+      .where(eq(topics.userId, userId))
+      .then(r => r[0]?.count ?? 0),
+
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(collections)
+      .where(eq(collections.userId, userId))
+      .then(r => r[0]?.count ?? 0),
+
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(tags)
+      .where(eq(tags.userId, userId))
+      .then(r => r[0]?.count ?? 0),
+
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.isArchived, true)))
+      .then(r => r[0]?.count ?? 0),
+  ])
+
+  return c.json({
+    data: { bookmarkCount, topicCount, collectionCount, tagCount, archivedCount },
+    error: null,
+  })
+})
+
+// ─────────────────────────────────────────────
+// PATCH /auth/profile — update name + username
+// ─────────────────────────────────────────────
+auth.patch('/profile', authMiddleware, async (c) => {
+  const userId = c.get('userId')
+  const { name, username } = await c.req.json()
+
+  // Check username uniqueness
+  if (username) {
+    const clean = username.toLowerCase().replace(/[^a-z0-9_-]/g, '')
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.username, clean), sql`id != ${userId}::uuid`))
+      .limit(1)
+
+    if (existing.length > 0) {
+      return c.json({
+        data:  null,
+        error: { code: 'USERNAME_TAKEN', message: 'Username is already taken' }
+      }, 400)
+    }
+
+    await db.update(users)
+      .set({ name: name ?? null, username: clean })
+      .where(eq(users.id, userId))
+  } else {
+    await db.update(users)
+      .set({ name: name ?? null })
+      .where(eq(users.id, userId))
+  }
+
+  const updated = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+
+  return c.json({ data: { user: updated }, error: null })
+})
+
+// ─────────────────────────────────────────────
+// POST /auth/change-password
+// ─────────────────────────────────────────────
+auth.post('/change-password', authMiddleware, async (c) => {
+  const userId = c.get('userId')
+  const { currentPassword, newPassword } = await c.req.json()
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+
+  if (!user) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
+  }
+
+  const bcrypt = await import('bcryptjs')
+  const valid  = await bcrypt.compare(currentPassword, user.password)
+
+  if (!valid) {
+    return c.json({
+      data:  null,
+      error: { code: 'INVALID_PASSWORD', message: 'Current password is incorrect' }
+    }, 400)
+  }
+
+  const hash = await bcrypt.hash(newPassword, 10)
+  await db.update(users).set({ password: hash }).where(eq(users.id, userId))
+
+  return c.json({ data: { success: true }, error: null })
 })
 
 export default auth
