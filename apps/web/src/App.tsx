@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { PublicProfilePage } from './pages/PublicProfilePage'
 import { PublicTopicPage } from './pages/PublicTopicPage'
 import { PublicCollectionPage } from './pages/PublicCollectionPage'
+import { AdminPage } from './pages/AdminPage'
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { auth } = useAuth()
 
@@ -34,13 +35,11 @@ export default function App() {
     <ToastProvider>
     <AuthContext.Provider value={authValue}>
       <Routes>
-        <Route
-          path="/auth"
-          element={<AuthPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />}
-        />
-
+        <Route path="/auth" element={<AuthPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />}/>
+          <Route path="/p/:username" element={<PublicProfilePage />} />
         <Route path="/p/:username/topic/:slug"      element={<PublicTopicPage />} />
         <Route path="/p/:username/collection/:slug" element={<PublicCollectionPage />} />
+        <Route path="/admin" element={<AdminPage />} />
 
         <Route
           path="/*"

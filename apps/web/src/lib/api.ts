@@ -251,3 +251,25 @@ export const profileApi = {
     })
   },
 }
+
+export const adminApi = {
+  async getStats() {
+    return apiFetch<{
+      users:   { total: number; newThisWeek: number; newThisMonth: number }
+      content: { bookmarks: number; topics: number; collections: number; newBookmarksThisWeek: number }
+    }>('/api/admin/stats')
+  },
+
+  async getUsers(page = 1) {
+    return apiFetch<{
+      users: any[]
+      total: number
+      page:  number
+      limit: number
+    }>(`/api/admin/users?page=${page}`)
+  },
+
+  async deleteUser(id: string) {
+    return apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+  },
+}
