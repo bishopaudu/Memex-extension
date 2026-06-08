@@ -49,6 +49,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
   const [showSearch,       setShowSearch]       = useState(false)
   const [selectedIds,      setSelectedIds]      = useState<string[]>([])
   const [showProfile,      setShowProfile]      = useState(false)
+  const [avatarUrl,        setAvatarUrl]        = useState('')
   const [debouncedSearch,  setDebouncedSearch]  = useState('')
 
   useEffect(() => {
@@ -62,7 +63,15 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
     setSelectedIds([])
   }, [debouncedSearch, activeTag, activeCollection, page])
 
-  useEffect(() => { fetchTags(); fetchCollections(); fetchTopics() }, [])
+  useEffect(() => {
+    fetchTags()
+    fetchCollections()
+    fetchTopics()
+    // Load avatar from auth user
+    if (auth.status === 'authenticated' && auth.user?.avatarUrl) {
+      setAvatarUrl(auth.user.avatarUrl)
+    }
+  }, [])
 
   // Global Cmd+K to open search
   useEffect(() => {
@@ -192,6 +201,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
         onOpenArchive={() => setPage({ type: 'archive' })}
         onOpenReadingList={() => setPage({ type: 'reading' })}
         onOpenProfile={() => setShowProfile(true)}
+        avatarUrl={avatarUrl}
         onGoHome={() => {
           setPage({ type: 'home' })
           setActiveCollection('')
@@ -416,10 +426,10 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
       {/* Profile modal */}
       {showProfile && auth.status === 'authenticated' && (
         <ProfileModal
-          user={auth.user}
+          user={{ ...auth.user, avatarUrl }}
           onClose={() => setShowProfile(false)}
           onUpdate={(updatedUser) => {
-            // Update auth context if possible
+            if (updatedUser.avatarUrl) setAvatarUrl(updatedUser.avatarUrl)
             setShowProfile(false)
           }}
         />

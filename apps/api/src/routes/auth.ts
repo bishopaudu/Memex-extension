@@ -279,4 +279,43 @@ auth.post('/change-password', authMiddleware, async (c) => {
   return c.json({ data: { success: true }, error: null })
 })
 
+// ─────────────────────────────────────────────
+// POST /auth/avatar — upload profile photo
+// ─────────────────────────────────────────────
+auth.post('/avatar', authMiddleware, async (c) => {
+  const userId = c.get('userId')
+  const { imageDataUrl } = await c.req.json()
+
+  if (!imageDataUrl || !imageDataUrl.startsWith('data:image/')) {
+    return c.json({
+      data:  null,
+      error: { code: 'INVALID_IMAGE', message: 'Invalid image data' }
+    }, 400)
+  }
+
+  try {
+    const { uploadScreenshot } = await import('../lib/storage')
+    const result = await uploadScreenshot(imageDataUrl, userId)
+
+    if (!result) {
+      return c.json({
+        data:  null,
+        error: { code: 'UPLOAD_FAILED', message: 'Failed to upload image' }
+      }, 500)
+    }
+
+    await db.update(users)
+      .set({ avatarUrl: result.url })
+      .where(eq(users.id, userId))
+
+    return c.json({ data: { avatarUrl: result.url }, error: null })
+  } catch (err) {
+    console.error('[Avatar upload]', err)
+    return c.json({
+      data:  null,
+      error: { code: 'UPLOAD_FAILED', message: 'Upload failed' }
+    }, 500)
+  }
+})
+
 export default auth

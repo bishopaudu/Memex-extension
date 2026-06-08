@@ -250,6 +250,13 @@ export const profileApi = {
       body:   JSON.stringify({ currentPassword, newPassword }),
     })
   },
+
+  async uploadAvatar(imageDataUrl: string) {
+    return apiFetch<{ avatarUrl: string }>('/api/auth/avatar', {
+      method: 'POST',
+      body:   JSON.stringify({ imageDataUrl }),
+    })
+  },
 }
 
 export const adminApi = {

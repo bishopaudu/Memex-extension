@@ -20,8 +20,9 @@ interface Props {
   onOpenReadingList: () => void
   onGoHome:         () => void
   onOpenProfile:      () => void
-  userEmail: string
-  onLogout: () => void
+  userEmail:  string
+  avatarUrl?: string
+  onLogout:   () => void
 }
 
 const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4']
@@ -29,7 +30,7 @@ const COLORS = ['#4f6ef7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06
 export function Sidebar({
   tags, collections, activeTag, activeCollection,
   bookmarkCount, currentPage, onTagClick, onCollectionClick,
-  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onOpenReadingList, onGoHome, onOpenProfile,
+  onCollectionsChange, onOpenCollectionsPage, onOpenWikiPage, onOpenArchive, onOpenReadingList, onGoHome, onOpenProfile, avatarUrl,
   userEmail, onLogout
 }: Props) {
   const [creating,   setCreating]   = useState(false)
@@ -276,12 +277,20 @@ export function Sidebar({
       <div className="p-3 border-t border-surface-4 flex items-center gap-2">
         <button
           onClick={onOpenProfile}
-          className="w-6 h-6 rounded-full bg-brand/20 flex items-center justify-center
-                     text-[10px] font-medium text-brand-bright flex-shrink-0
-                     hover:bg-brand/30 transition-colors"
+          className="w-6 h-6 rounded-full overflow-hidden flex items-center
+                     justify-center flex-shrink-0 hover:opacity-80
+                     transition-opacity"
           title="View profile"
         >
-          {initial}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Avatar"
+                 className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-brand/20 flex items-center
+                            justify-center text-[10px] font-medium text-brand-bright">
+              {initial}
+            </div>
+          )}
         </button>
         <button
           onClick={onOpenProfile}

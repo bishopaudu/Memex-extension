@@ -24,6 +24,8 @@ export function ProfileModal({ user, onClose, onUpdate }: Props) {
   const [name,         setName]         = useState(user.name ?? '')
   const [username,     setUsername]     = useState(user.username ?? '')
   const [saving,       setSaving]       = useState(false)
+  const [avatarUrl,    setAvatarUrl]    = useState(user.avatarUrl ?? '')
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [stats,        setStats]        = useState<any | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
 
@@ -94,11 +96,82 @@ export function ProfileModal({ user, onClose, onUpdate }: Props) {
         <div className="flex items-center justify-between px-5 py-4
                         border-b border-surface-4">
           <div className="flex items-center gap-3">
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-brand/20 flex items-center
-                            justify-center text-base font-bold text-brand-bright
-                            flex-shrink-0">
-              {initial}
+            {/* Avatar — click to upload */}
+            <div className="relative flex-shrink-0">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-brand/20
+                              flex items-center justify-center cursor-pointer
+                              hover:opacity-80 transition-opacity"
+                   onClick={() => document.getElementById('avatar-input')?.click()}
+                   title="Click to change photo"
+              >
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar"
+                       className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-base font-bold text-brand-bright">
+                    {initial}
+                  </span>
+                )}
+              </div>
+              {/* Upload indicator */}
+              {avatarUploading ? (
+                <div className="absolute inset-0 rounded-full bg-black/50
+                                flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent
+                                  rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full
+                                bg-brand flex items-center justify-center
+                                cursor-pointer border-2 border-surface-2"
+                     onClick={() => document.getElementById('avatar-input')?.click()}>
+                  <svg className="w-2.5 h-2.5 text-white" fill="none"
+                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                </div>
+              )}
+              <input
+                id="avatar-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+
+                  // Validate size (max 5MB)
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast('Image must be under 5MB', 'error')
+                    return
+                  }
+
+                  setAvatarUploading(true)
+                  try {
+                    // Read as base64
+                    const dataUrl = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader()
+                      reader.onload  = () => resolve(reader.result as string)
+                      reader.onerror = reject
+                      reader.readAsDataURL(file)
+                    })
+
+                    const r = await profileApi.uploadAvatar(dataUrl)
+                    if (r.error) {
+                      toast(r.error.message, 'error')
+                    } else {
+                      setAvatarUrl(r.data.avatarUrl)
+                      onUpdate({ ...user, avatarUrl: r.data.avatarUrl })
+                      toast('Profile photo updated', 'success', '📸')
+                    }
+                  } catch {
+                    toast('Upload failed', 'error')
+                  }
+                  setAvatarUploading(false)
+                  // Reset input so same file can be re-selected
+                  e.target.value = ''
+                }}
+              />
             </div>
             <div>
               <p className="text-sm font-semibold text-ink-1">
