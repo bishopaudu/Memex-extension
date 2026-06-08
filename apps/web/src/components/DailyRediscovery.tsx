@@ -29,11 +29,11 @@ export function DailyRediscovery({ onOpenBookmark }: Props) {
 
   async function fetchRediscovery(today: string) {
     setLoading(true)
-    // Get a page of older bookmarks and randomly sample 5
-    const r = await bookmarksApi.list({ page: 2 })
-    if (!r.error && r.data.items.length > 0) {
-      // Shuffle and take 5
-      const shuffled = r.data.items
+    // Fetch a larger set then randomly sample 5
+    // Try page 1 first with higher limit, then sample randomly
+    const r = await bookmarksApi.list({ limit: 50 } as any)
+    if (!r.error && r.data.items.length >= 3) {
+      const shuffled = [...r.data.items]
         .sort(() => Math.random() - 0.5)
         .slice(0, 5)
       setItems(shuffled)
