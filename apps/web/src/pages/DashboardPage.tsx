@@ -387,8 +387,10 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
             )}
 
             {!loading && bookmarks.length > 0 && view === 'grid' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3
+                              space-y-3">
                 {bookmarks.map(b => (
+                  <div key={b.id} className="break-inside-avoid mb-3">
                   <BookmarkCard
                     key={b.id}
                     bookmark={b}
@@ -402,6 +404,7 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                     onOpenModal={b => setPage({ type: 'bookmark-detail', bookmarkId: b.id })}
                     onCollectionsChange={() => { fetchCollections(); fetchBookmarks() }}
                   />
+                  </div>
                 ))}
               </div>
             )}

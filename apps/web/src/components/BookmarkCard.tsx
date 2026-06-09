@@ -110,8 +110,9 @@ export function BookmarkCard({
         </div>
       )}
 
-      {/* Thumbnail */}
-      <div className="w-full h-32 bg-surface-3 overflow-hidden relative">
+      {/* Thumbnail — height varies by content for masonry effect */}
+      <div className="w-full bg-surface-3 overflow-hidden relative"
+           style={{ minHeight: '80px' }}>
         {image ? (
           <img
             src={image}
