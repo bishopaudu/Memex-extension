@@ -46,6 +46,12 @@ export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }:
   const [sharing,      setSharing]      = useState(false)
   const [shareUrl,     setShareUrl]     = useState<string | null>(null)
   const [sharecopied,  setShareCopied]  = useState(false)
+  const [editing,      setEditing]      = useState(false)
+  const [editTitle,    setEditTitle]    = useState('')
+  const [editDesc,     setEditDesc]     = useState('')
+  const [editTags,     setEditTags]     = useState<string[]>([])
+  const [editSaving,   setEditSaving]   = useState(false)
+  const [showExport,   setShowExport]   = useState(false)
 
   useEffect(() => { fetchBookmark() }, [bookmarkId])
 
@@ -65,6 +71,75 @@ export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }:
     const r = await bookmarksApi.getOne(bookmarkId)
     if (!r.error) setBookmark(r.data.bookmark)
     setLoading(false)
+  }
+
+  function startEditing() {
+    if (!bookmark) return
+    setEditTitle(bookmark.title ?? '')
+    setEditDesc(bookmark.description ?? '')
+    setEditTags(bookmark.tags.map(t => t.name))
+    setEditing(true)
+  }
+
+  async function handleSaveEdit() {
+    if (!bookmark) return
+    setEditSaving(true)
+    const r = await bookmarksApi.update(bookmark.id, {
+      title:       editTitle,
+      description: editDesc,
+      tags:        editTags,
+    })
+    if (!r.error) {
+      setBookmark(prev => prev ? {
+        ...prev,
+        title:       editTitle,
+        description: editDesc,
+        tags:        editTags.map(name => ({ id: name, name })),
+      } : prev)
+      setEditing(false)
+    }
+    setEditSaving(false)
+  }
+
+  function exportAsMarkdown() {
+    if (!bookmark) return
+    const lines = [
+      `# ${bookmark.title ?? bookmark.url}`,
+      ``,
+      `**URL:** ${bookmark.url}`,
+      bookmark.description ? `
+**Description:** ${bookmark.description}` : '',
+      bookmark.tags.length > 0
+        ? `
+**Tags:** ${bookmark.tags.map(t => `#${t.name}`).join(' ')}`
+        : '',
+      `
+**Saved:** ${new Date(bookmark.createdAt).toLocaleDateString()}`,
+    ]
+
+    // Add notes
+    const notes = (bookmark.attachments ?? []).filter(a => a.type === 'text')
+    if (notes.length > 0) {
+      lines.push('## notes')
+      notes.forEach(n => lines.push(`
+${n.content}`))
+    }
+
+    const md   = lines.filter(Boolean).join('')
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${(bookmark.title ?? 'bookmark').slice(0, 40).replace(/[^a-z0-9]/gi, '-')}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function copyAsRichText() {
+    if (!bookmark) return
+    const text = `${bookmark.title ?? bookmark.url}
+${bookmark.url}`
+    navigator.clipboard.writeText(text)
   }
 
   async function handleTogglePublic() {
@@ -261,6 +336,72 @@ const tabs = allTabs.filter(
               >
                 Get link
               </button>
+            )}
+          </div>
+
+          {/* Edit button */}
+          <button
+            onClick={startEditing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-3
+                       border border-surface-4 text-xs text-ink-2 rounded-lg
+                       hover:bg-surface-4 transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" strokeWidth={2}>
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </button>
+
+          {/* Export button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExport(!showExport)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-3
+                         border border-surface-4 text-xs text-ink-2 rounded-lg
+                         hover:bg-surface-4 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                   stroke="currentColor" strokeWidth={2}>
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export
+            </button>
+
+            {showExport && (
+              <div className="absolute right-0 top-full mt-1 w-44 bg-surface-2
+                             border border-surface-4 rounded-xl overflow-hidden
+                             shadow-xl z-20">
+                <button
+                  onClick={() => { exportAsMarkdown(); setShowExport(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs
+                             text-ink-2 hover:bg-surface-3 transition-colors text-left"
+                >
+                  <span>📝</span> Export as Markdown
+                </button>
+                <button
+                  onClick={() => { copyAsRichText(); setShowExport(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs
+                             text-ink-2 hover:bg-surface-3 transition-colors text-left
+                             border-t border-surface-4"
+                >
+                  <span>📋</span> Copy title + URL
+                </button>
+                
+                  <a href={bookmark.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2.5 text-xs
+                             text-ink-2 hover:bg-surface-3 transition-colors
+                             border-t border-surface-4"
+                  onClick={() => setShowExport(false)}
+                >
+                  <span>🌐</span> Open original
+                </a>
+              </div>
             )}
           </div>
 
@@ -639,6 +780,131 @@ const tabs = allTabs.filter(
           )}
         </div>
       </div>
+
+      {/* ── EDIT MODAL ── */}
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setEditing(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-surface-2 border border-surface-4
+                       rounded-2xl overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4
+                            border-b border-surface-4">
+              <p className="text-sm font-semibold text-ink-1">Edit bookmark</p>
+              <button onClick={() => setEditing(false)}
+                      className="text-ink-4 hover:text-ink-1 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" strokeWidth={2}>
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6"  y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="p-5 flex flex-col gap-4">
+              {/* Title */}
+              <div>
+                <label className="block text-[10px] font-medium text-ink-4
+                                   uppercase tracking-wider mb-1.5">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-3 border border-surface-4
+                             rounded-lg text-sm text-ink-1 outline-none
+                             focus:border-brand transition-colors"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-[10px] font-medium text-ink-4
+                                   uppercase tracking-wider mb-1.5">
+                  Description
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={e => setEditDesc(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-surface-3 border border-surface-4
+                             rounded-lg text-sm text-ink-1 outline-none resize-none
+                             focus:border-brand transition-colors"
+                />
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-[10px] font-medium text-ink-4
+                                   uppercase tracking-wider mb-1.5">
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-2 bg-surface-3
+                                border border-surface-4 rounded-lg
+                                focus-within:border-brand transition-colors
+                                min-h-[38px]">
+                  {editTags.map(tag => (
+                    <span key={tag}
+                          className="flex items-center gap-1 px-2 py-0.5
+                                     bg-brand/10 text-brand-bright text-xs
+                                     rounded-md">
+                      {tag}
+                      <button
+                        onClick={() => setEditTags(prev => prev.filter(t => t !== tag))}
+                        className="text-brand-bright/60 hover:text-brand-bright"
+                      >×</button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder="Add tag..."
+                    className="flex-1 min-w-[80px] bg-transparent text-xs
+                               text-ink-1 outline-none placeholder-ink-5"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault()
+                        const val = (e.target as HTMLInputElement).value.trim()
+                        if (val && !editTags.includes(val)) {
+                          setEditTags(prev => [...prev, val])
+                          ;(e.target as HTMLInputElement).value = ''
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 bg-brand text-white text-sm
+                             font-medium rounded-lg hover:bg-brand/90
+                             disabled:opacity-40 transition-colors"
+                >
+                  {editSaving ? 'Saving...' : 'Save changes'}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="px-4 py-2.5 text-ink-3 text-sm hover:text-ink-1
+                             hover:bg-surface-3 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── LIGHTBOX ── */}
       {lightbox && (
