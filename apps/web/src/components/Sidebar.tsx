@@ -273,6 +273,23 @@ export function Sidebar({
         )}
       </nav>
 
+      {/* Explore link */}
+      <div className="px-2 pb-2">
+        <a href="/explore" target="_blank"
+           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md
+                      text-xs text-ink-4 hover:text-ink-2 hover:bg-surface-3
+                      transition-colors">
+          <span className="text-sm">🌍</span>
+          Explore public knowledge
+          <svg className="w-2.5 h-2.5 ml-auto text-ink-5" fill="none"
+               viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+      </div>
+
       {/* User footer */}
       <div className="p-3 border-t border-surface-4 flex items-center gap-2">
         <button

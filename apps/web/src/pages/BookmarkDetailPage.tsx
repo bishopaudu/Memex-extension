@@ -20,6 +20,8 @@ interface Bookmark {
   screenshotUrl: string | null
   faviconUrl:    string | null
   ogImageUrl:    string | null
+  isPublic:      boolean
+  publicSlug:    string | null
   tags:          Tag[]
   attachments:   Attachment[]
   createdAt:     string
@@ -40,7 +42,10 @@ export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }:
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState<Tab>('overview')
   const [lightbox,  setLightbox]  = useState<string | null>(null)
-  const [copied,    setCopied]    = useState(false)
+  const [copied,       setCopied]       = useState(false)
+  const [sharing,      setSharing]      = useState(false)
+  const [shareUrl,     setShareUrl]     = useState<string | null>(null)
+  const [sharecopied,  setShareCopied]  = useState(false)
 
   useEffect(() => { fetchBookmark() }, [bookmarkId])
 
@@ -60,6 +65,26 @@ export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }:
     const r = await bookmarksApi.getOne(bookmarkId)
     if (!r.error) setBookmark(r.data.bookmark)
     setLoading(false)
+  }
+
+  async function handleTogglePublic() {
+    if (!bookmark) return
+    setSharing(true)
+    const r = await bookmarksApi.update(bookmark.id, { isPublic: !bookmark.isPublic })
+    if (!r.error) {
+      const newIsPublic = !bookmark.isPublic
+      setBookmark(prev => prev ? { ...prev, isPublic: newIsPublic } : prev)
+      if (newIsPublic) {
+        const slug = (r.data as any)?.publicSlug
+        if (slug) {
+          setShareUrl(`${window.location.origin}/p/b/${slug}`)
+          setBookmark(prev => prev ? { ...prev, publicSlug: slug } : prev)
+        }
+      } else {
+        setShareUrl(null)
+      }
+    }
+    setSharing(false)
   }
 
   if (loading) {
@@ -196,6 +221,49 @@ const tabs = allTabs.filter(
               </>
             )}
           </button>
+          {/* Share toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTogglePublic}
+              disabled={sharing}
+              className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0
+                          ${bookmark.isPublic ? 'bg-green-500' : 'bg-surface-5'}
+                          ${sharing ? 'opacity-50' : 'cursor-pointer'}`}
+              title={bookmark.isPublic ? 'Make private' : 'Make public'}
+            >
+              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white
+                               transition-transform shadow-sm
+                               ${bookmark.isPublic ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+            <span className="text-[10px] text-ink-4 hidden sm:block">
+              {bookmark.isPublic ? 'Public' : 'Private'}
+            </span>
+            {bookmark.isPublic && shareUrl && (
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl)
+                  setShareCopied(true)
+                  setTimeout(() => setShareCopied(false), 2000)
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px]
+                           bg-brand/10 text-brand-bright rounded-lg
+                           hover:bg-brand/20 transition-colors"
+              >
+                {sharecopied ? '✓ Copied' : '🔗 Share'}
+              </button>
+            )}
+            {bookmark.isPublic && !shareUrl && bookmark.publicSlug && (
+              <button
+                onClick={() => setShareUrl(
+                  `${window.location.origin}/p/b/${bookmark.publicSlug}`
+                )}
+                className="text-[10px] text-brand-bright hover:underline"
+              >
+                Get link
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => { onDelete(bookmark.id); onBack() }}
             className="w-8 h-8 flex items-center justify-center rounded-lg

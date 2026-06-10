@@ -31,6 +31,7 @@ const updateBookmarkSchema = z.object({
   title:         z.string().optional(),
   description:   z.string().optional(),
   isArchived:    z.boolean().optional(),
+  isPublic:      z.boolean().optional(),
   screenshotUrl: optionalUrl,
   screenshotKey: z.string().optional(),
   tags:          z.array(z.string()).optional(),
@@ -264,6 +265,20 @@ bookmarksRouter.patch('/:id', zValidator('json', updateBookmarkSchema), async (c
     if (input.isArchived    !== undefined) updates.isArchived    = input.isArchived
     if (input.screenshotUrl !== undefined) updates.screenshotUrl = input.screenshotUrl
     if (input.screenshotKey !== undefined) updates.screenshotKey = input.screenshotKey
+    if (input.isPublic      !== undefined) {
+      updates.isPublic = input.isPublic
+      // Generate public slug when making public
+      if (input.isPublic) {
+        const titleSlug = (input.title ?? '')
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .slice(0, 50)
+        updates.publicSlug = titleSlug
+          ? `${titleSlug}-${id.slice(0, 6)}`
+          : id.slice(0, 8)
+      }
+    }
 
     await tx
       .update(bookmarks)
@@ -302,7 +317,14 @@ bookmarksRouter.patch('/:id', zValidator('json', updateBookmarkSchema), async (c
     }
   })
 
-  return c.json({ data: { success: true }, error: null })
+  // Return slug so frontend can build share URL
+  const [updated] = await db
+    .select({ publicSlug: bookmarks.publicSlug, isPublic: bookmarks.isPublic })
+    .from(bookmarks)
+    .where(eq(bookmarks.id, id))
+    .limit(1)
+
+  return c.json({ data: { success: true, publicSlug: updated?.publicSlug, isPublic: updated?.isPublic }, error: null })
 })
 
 // ─────────────────────────────────────────────

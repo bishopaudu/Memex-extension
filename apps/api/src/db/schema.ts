@@ -47,6 +47,8 @@ export const bookmarks = pgTable('bookmarks', {
   faviconUrl:     text('favicon_url'),
   ogImageUrl:     text('og_image_url'),
   isArchived:     boolean('is_archived').default(false),
+  isPublic:       boolean('is_public').default(false),
+  publicSlug:     text('public_slug').unique(),
   createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt:      timestamp('updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({

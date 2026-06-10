@@ -8,6 +8,8 @@ import { PublicProfilePage } from './pages/PublicProfilePage'
 import { PublicTopicPage } from './pages/PublicTopicPage'
 import { PublicCollectionPage } from './pages/PublicCollectionPage'
 import { AdminPage } from './pages/AdminPage'
+import { PublicBookmarkPage } from './pages/PublicBookmarkPage'
+import { ExplorePage } from './pages/ExplorePage'
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { auth } = useAuth()
 
@@ -39,6 +41,8 @@ export default function App() {
           <Route path="/p/:username" element={<PublicProfilePage />} />
         <Route path="/p/:username/topic/:slug"      element={<PublicTopicPage />} />
         <Route path="/p/:username/collection/:slug" element={<PublicCollectionPage />} />
+          <Route path="/p/b/:slug" element={<PublicBookmarkPage />} />
+  <Route path="/explore" element={<ExplorePage />} />
         <Route path="/admin" element={<AdminPage />} />
 
         <Route
