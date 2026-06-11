@@ -240,6 +240,73 @@ publicRouter.get('/:username/collection/:slug', async (c) => {
   }
 })
 
+
+// ─────────────────────────────────────────────
+// GET /p/explore — public discovery feed
+// MUST be registered before /:username
+// ─────────────────────────────────────────────
+publicRouter.get('/explore', async (c) => {
+  const type = c.req.query('type') ?? 'all'
+
+  try {
+    const results: any = {}
+
+    if (type === 'all' || type === 'topics') {
+      const topicRows = await db.execute(
+        sql`SELECT t.id, t.title, t.emoji, t.summary, t.cover_color,
+                   t.slug, t.updated_at,
+                   u.username, u.name as user_name
+            FROM topics t
+            JOIN users u ON u.id = t.user_id
+            WHERE t.is_public = true AND t.slug IS NOT NULL
+            ORDER BY t.updated_at DESC
+            LIMIT 12`
+      )
+      results.topics = topicRows
+    }
+
+    if (type === 'all' || type === 'collections') {
+      const collRows = await db.execute(
+        sql`SELECT c.id, c.name, c.icon, c.color, c.description,
+                   c.slug, c.updated_at,
+                   u.username, u.name as user_name,
+                   COUNT(bc.bookmark_id)::int as bookmark_count
+            FROM collections c
+            JOIN users u ON u.id = c.user_id
+            LEFT JOIN bookmark_collections bc ON bc.collection_id = c.id
+            WHERE c.is_public = true AND c.slug IS NOT NULL
+            GROUP BY c.id, u.username, u.name
+            ORDER BY c.updated_at DESC
+            LIMIT 12`
+      )
+      results.collections = collRows
+    }
+
+    if (type === 'all' || type === 'bookmarks') {
+      const bmRows = await db.execute(
+        sql`SELECT b.id, b.url, b.title, b.description,
+                   b.favicon_url, b.og_image_url, b.screenshot_url,
+                   b.public_slug, b.created_at,
+                   u.username, u.name as user_name
+            FROM bookmarks b
+            JOIN users u ON u.id = b.user_id
+            WHERE b.is_public = true AND b.public_slug IS NOT NULL
+            ORDER BY b.created_at DESC
+            LIMIT 24`
+      )
+      results.bookmarks = bmRows
+    }
+
+    return c.json({ data: results, error: null })
+  } catch (err) {
+    console.error('[Explore]', err)
+    return c.json({
+      data:  null,
+      error: { code: 'SERVER_ERROR', message: 'Something went wrong' }
+    }, 500)
+  }
+})
+
 // ─────────────────────────────────────────────
 // GET /p/:username — public profile
 // ─────────────────────────────────────────────
@@ -359,249 +426,3 @@ publicRouter.get('/b/:slug', async (c) => {
 export default publicRouter
 
 
-/*import { Hono } from 'hono'
-import { sql } from 'drizzle-orm'
-import { db } from '../db'
-
-export const publicRouter = new Hono()
-
-export function generateSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 60)
-    .replace(/^-|-$/g, '')
-    || 'untitled'
-}
-
-publicRouter.get('/:username/topic/:slug', async (c) => {
-  const username = c.req.param('username').toLowerCase()
-  const slug     = c.req.param('slug')
-  try {
-    const userRows = await db.execute(sql`SELECT id, username, name FROM users WHERE username = ${username} LIMIT 1`)
-    const user = (userRows as any)[0] ?? null
-    if (!user) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
-
-    const topicRows = await db.execute(sql`SELECT * FROM topics WHERE user_id = ${user.id}::uuid AND slug = ${slug} AND is_public = true LIMIT 1`)
-    const topic = (topicRows as any)[0] ?? null
-    if (!topic) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Topic not found' } }, 404)
-
-    const blockRows  = await db.execute(sql`SELECT * FROM topic_blocks WHERE topic_id = ${topic.id}::uuid ORDER BY "order" ASC`)
-    const refRows    = await db.execute(sql`SELECT * FROM topic_references WHERE topic_id = ${topic.id}::uuid`)
-    const refArr     = refRows as any[]
-    const connRows   = await db.execute(sql`SELECT tc.to_topic_id, t.title, t.emoji, t.slug FROM topic_connections tc JOIN topics t ON t.id = tc.to_topic_id WHERE tc.from_topic_id = ${topic.id}::uuid AND t.is_public = true AND t.slug IS NOT NULL`)
-
-    let refBookmarks: any[] = []
-    if (refArr.length > 0) {
-      const ids = refArr.map((r: any) => r.bookmark_id)
-      refBookmarks = await db.execute(sql`SELECT b.id, b.url, b.title, b.description, b.favicon_url, COALESCE(json_agg(json_build_object('id', t.id, 'name', t.name)) FILTER (WHERE t.id IS NOT NULL), '[]') as tags FROM bookmarks b LEFT JOIN bookmark_tags bt ON bt.bookmark_id = b.id LEFT JOIN tags t ON t.id = bt.tag_id WHERE b.id = ANY(${ids}::uuid[]) GROUP BY b.id`) as any[]
-    }
-    const refMap = Object.fromEntries((refBookmarks as any[]).map((b: any) => [b.id, b]))
-
-    return c.json({
-      data: {
-        author: { username: user.username, name: user.name },
-        topic: {
-          id: topic.id, title: topic.title, emoji: topic.emoji,
-          summary: topic.summary, coverColor: topic.cover_color,
-          slug: topic.slug, updatedAt: topic.updated_at,
-          blocks: (blockRows as any[]).map((b: any) => ({ id: b.id, type: b.type, content: b.content, metadata: b.metadata, order: b.order })),
-          references: refArr.map((r: any) => {
-            const bm = refMap[r.bookmark_id]
-            if (!bm) return null
-            return { bookmarkId: r.bookmark_id, note: r.note, bookmark: { id: bm.id, url: bm.url, title: bm.title, description: bm.description, faviconUrl: bm.favicon_url, tags: typeof bm.tags === 'string' ? JSON.parse(bm.tags) : bm.tags } }
-          }).filter(Boolean),
-          connections: (connRows as any[]).map((conn: any) => ({ topicId: conn.to_topic_id, title: conn.title, emoji: conn.emoji, slug: conn.slug })),
-        }
-      },
-      error: null,
-    })
-  } catch (err) {
-    console.error('[Public topic]', err)
-    return c.json({ data: null, error: { code: 'SERVER_ERROR', message: 'Something went wrong' } }, 500)
-  }
-})
-
-publicRouter.get('/:username/collection/:slug', async (c) => {
-  const username = c.req.param('username').toLowerCase()
-  const slug     = c.req.param('slug')
-  try {
-    const userRows = await db.execute(sql`SELECT id, username, name FROM users WHERE username = ${username} LIMIT 1`)
-    const user = (userRows as any)[0] ?? null
-    if (!user) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
-
-    const collRows = await db.execute(sql`SELECT * FROM collections WHERE user_id = ${user.id}::uuid AND slug = ${slug} AND is_public = true LIMIT 1`)
-    const collection = (collRows as any)[0] ?? null
-    if (!collection) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Collection not found' } }, 404)
-
-    const bmRows = await db.execute(sql`SELECT b.id, b.url, b.title, b.description, b.favicon_url, b.og_image_url, b.created_at, COALESCE(json_agg(json_build_object('id', t.id, 'name', t.name)) FILTER (WHERE t.id IS NOT NULL), '[]') as tags FROM bookmarks b JOIN bookmark_collections bc ON bc.bookmark_id = b.id LEFT JOIN bookmark_tags bt ON bt.bookmark_id = b.id LEFT JOIN tags t ON t.id = bt.tag_id WHERE bc.collection_id = ${collection.id}::uuid GROUP BY b.id ORDER BY b.created_at DESC`)
-
-    return c.json({
-      data: {
-        author: { username: user.username, name: user.name },
-        collection: { id: collection.id, name: collection.name, icon: collection.icon, color: collection.color, description: collection.description, slug: collection.slug },
-        bookmarks: (bmRows as any[]).map((b: any) => ({ id: b.id, url: b.url, title: b.title, description: b.description, faviconUrl: b.favicon_url, ogImageUrl: b.og_image_url, tags: typeof b.tags === 'string' ? JSON.parse(b.tags) : b.tags, createdAt: b.created_at })),
-      },
-      error: null,
-    })
-  } catch (err) {
-    console.error('[Public collection]', err)
-    return c.json({ data: null, error: { code: 'SERVER_ERROR', message: 'Something went wrong' } }, 500)
-  }
-})
-
-publicRouter.get('/:username', async (c) => {
-  const username = c.req.param('username').toLowerCase()
-  try {
-    const userRows = await db.execute(sql`SELECT id, username, name FROM users WHERE username = ${username} LIMIT 1`)
-    const user = (userRows as any)[0] ?? null
-    if (!user) return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'User not found' } }, 404)
-
-    const topicRows = await db.execute(sql`SELECT id, title, emoji, summary, cover_color, slug, updated_at FROM topics WHERE user_id = ${user.id}::uuid AND is_public = true`)
-    const collRows  = await db.execute(sql`SELECT id, name, icon, color, description, slug FROM collections WHERE user_id = ${user.id}::uuid AND is_public = true`)
-
-    return c.json({
-      data: {
-        user: { username: user.username, name: user.name },
-        topics: (topicRows as any[]).map((t: any) => ({ id: t.id, title: t.title, emoji: t.emoji, summary: t.summary, coverColor: t.cover_color, slug: t.slug, updatedAt: t.updated_at })),
-        collections: (collRows as any[]).map((c: any) => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, description: c.description, slug: c.slug })),
-      },
-      error: null,
-    })
-  } catch (err) {
-    console.error('[Public profile]', err)
-    return c.json({ data: null, error: { code: 'SERVER_ERROR', message: 'Something went wrong' } }, 500)
-  }
-})
-
-// ─────────────────────────────────────────────
-// GET /p/b/:slug — public bookmark page
-// ─────────────────────────────────────────────
-publicRouter.get('/b/:slug', async (c) => {
-  const slug = c.req.param('slug')
-  try {
-    const rows = await db.execute(
-      sql`SELECT b.*, u.username, u.name as user_name
-          FROM bookmarks b
-          JOIN users u ON u.id = b.user_id
-          WHERE b.public_slug = ${slug}
-          AND b.is_public = true
-          LIMIT 1`
-    )
-    const bookmark = (rows as any)[0] ?? null
-    if (!bookmark) {
-      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Bookmark not found' } }, 404)
-    }
-
-    // Get tags
-    const tagRows = await db.execute(
-      sql`SELECT t.id, t.name FROM tags t
-          JOIN bookmark_tags bt ON bt.tag_id = t.id
-          WHERE bt.bookmark_id = ${bookmark.id}::uuid`
-    )
-
-    // Get attachments
-    const attRows = await db.execute(
-      sql`SELECT * FROM attachments
-          WHERE bookmark_id = ${bookmark.id}::uuid
-          ORDER BY created_at ASC`
-    )
-
-    return c.json({
-      data: {
-        author:   { username: bookmark.username, name: bookmark.user_name },
-        bookmark: {
-          id:            bookmark.id,
-          url:           bookmark.url,
-          title:         bookmark.title,
-          description:   bookmark.description,
-          screenshotUrl: bookmark.screenshot_url,
-          faviconUrl:    bookmark.favicon_url,
-          ogImageUrl:    bookmark.og_image_url,
-          createdAt:     bookmark.created_at,
-          publicSlug:    bookmark.public_slug,
-          tags:          tagRows as any[],
-          attachments:   (attRows as any[]).filter(a => a.type !== 'text'),
-          notes:         (attRows as any[]).filter(a => a.type === 'text'),
-        }
-      },
-      error: null,
-    })
-  } catch (err) {
-    console.error('[Public bookmark]', err)
-    return c.json({ data: null, error: { code: 'SERVER_ERROR', message: 'Something went wrong' } }, 500)
-  }
-})
-
-export default publicRouter*/
-// ─────────────────────────────────────────────
-// GET /p/explore — public discovery feed
-// Shows recent public topics, collections,
-// and bookmarks from all users
-// ─────────────────────────────────────────────
-publicRouter.get('/explore', async (c) => {
-  const type = c.req.query('type') ?? 'all' // all | topics | collections | bookmarks
-
-  try {
-    const results: any = {}
-
-    if (type === 'all' || type === 'topics') {
-      const topicRows = await db.execute(
-        sql`SELECT t.id, t.title, t.emoji, t.summary, t.cover_color,
-                   t.slug, t.updated_at,
-                   u.username, u.name as user_name,
-                   COUNT(tr.bookmark_id)::int as ref_count
-            FROM topics t
-            JOIN users u ON u.id = t.user_id
-            LEFT JOIN topic_references tr ON tr.topic_id = t.id
-            WHERE t.is_public = true AND t.slug IS NOT NULL
-            GROUP BY t.id, u.username, u.name
-            ORDER BY t.updated_at DESC
-            LIMIT 12`
-      )
-      results.topics = topicRows
-    }
-
-    if (type === 'all' || type === 'collections') {
-      const collRows = await db.execute(
-        sql`SELECT c.id, c.name, c.icon, c.color, c.description,
-                   c.slug, c.updated_at,
-                   u.username, u.name as user_name,
-                   COUNT(bc.bookmark_id)::int as bookmark_count
-            FROM collections c
-            JOIN users u ON u.id = c.user_id
-            LEFT JOIN bookmark_collections bc ON bc.collection_id = c.id
-            WHERE c.is_public = true AND c.slug IS NOT NULL
-            GROUP BY c.id, u.username, u.name
-            ORDER BY c.updated_at DESC
-            LIMIT 12`
-      )
-      results.collections = collRows
-    }
-
-    if (type === 'all' || type === 'bookmarks') {
-      const bmRows = await db.execute(
-        sql`SELECT b.id, b.url, b.title, b.description,
-                   b.favicon_url, b.og_image_url, b.screenshot_url,
-                   b.public_slug, b.created_at,
-                   u.username, u.name as user_name
-            FROM bookmarks b
-            JOIN users u ON u.id = b.user_id
-            WHERE b.is_public = true AND b.public_slug IS NOT NULL
-            ORDER BY b.created_at DESC
-            LIMIT 24`
-      )
-      results.bookmarks = bmRows
-    }
-
-    return c.json({ data: results, error: null })
-  } catch (err) {
-    console.error('[Explore]', err)
-    return c.json({
-      data:  null,
-      error: { code: 'SERVER_ERROR', message: 'Something went wrong' }
-    }, 500)
-  }
-})
