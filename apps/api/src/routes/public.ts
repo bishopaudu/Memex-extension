@@ -255,7 +255,7 @@ publicRouter.get('/explore', async (c) => {
       const topicRows = await db.execute(
         sql`SELECT t.id, t.title, t.emoji, t.summary, t.cover_color,
                    t.slug, t.updated_at,
-                   u.username, u.name as user_name
+                   u.username, u.name as user_name, u.avatar_url
             FROM topics t
             JOIN users u ON u.id = t.user_id
             WHERE t.is_public = true AND t.slug IS NOT NULL
@@ -269,13 +269,13 @@ publicRouter.get('/explore', async (c) => {
       const collRows = await db.execute(
         sql`SELECT c.id, c.name, c.icon, c.color, c.description,
                    c.slug, c.updated_at,
-                   u.username, u.name as user_name,
+                   u.username, u.name as user_name, u.avatar_url,
                    COUNT(bc.bookmark_id)::int as bookmark_count
             FROM collections c
             JOIN users u ON u.id = c.user_id
             LEFT JOIN bookmark_collections bc ON bc.collection_id = c.id
             WHERE c.is_public = true AND c.slug IS NOT NULL
-            GROUP BY c.id, u.username, u.name
+            GROUP BY c.id, u.username, u.name, u.avatar_url
             ORDER BY c.updated_at DESC
             LIMIT 12`
       )
@@ -287,7 +287,7 @@ publicRouter.get('/explore', async (c) => {
         sql`SELECT b.id, b.url, b.title, b.description,
                    b.favicon_url, b.og_image_url, b.screenshot_url,
                    b.public_slug, b.created_at,
-                   u.username, u.name as user_name
+                   u.username, u.name as user_name, u.avatar_url
             FROM bookmarks b
             JOIN users u ON u.id = b.user_id
             WHERE b.is_public = true AND b.public_slug IS NOT NULL

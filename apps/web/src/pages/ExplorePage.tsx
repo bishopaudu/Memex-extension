@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 
 type Filter = 'all' | 'topics' | 'collections' | 'bookmarks'
 
+interface FeedItem {
+  kind: 'topic' | 'collection' | 'bookmark'
+  data: any
+}
+
 export function ExplorePage() {
   const [data,    setData]    = useState<any>({})
   const [loading, setLoading] = useState(true)
@@ -22,7 +27,18 @@ export function ExplorePage() {
   const topics      = (data.topics      ?? []) as any[]
   const collections = (data.collections ?? []) as any[]
   const bookmarks   = (data.bookmarks   ?? []) as any[]
-  const hasContent  = topics.length > 0 || collections.length > 0 || bookmarks.length > 0
+
+  // Unified feed — interleave for a natural Pinterest mix
+  const feed: FeedItem[] = []
+  const maxLen = Math.max(topics.length, collections.length, bookmarks.length)
+  for (let i = 0; i < maxLen; i++) {
+    if (topics[i])      feed.push({ kind: 'topic',      data: topics[i] })
+    if (bookmarks[i])    feed.push({ kind: 'bookmark',   data: bookmarks[i] })
+    if (bookmarks[i+1])  feed.push({ kind: 'bookmark',   data: bookmarks[i+1] })
+    if (collections[i]) feed.push({ kind: 'collection', data: collections[i] })
+  }
+
+  const hasContent = feed.length > 0
 
   return (
     <div className="min-h-screen bg-surface-0">
@@ -37,7 +53,9 @@ export function ExplorePage() {
           <span className="text-ink-5 text-xs">/</span>
           <span className="text-xs text-ink-3">Explore</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <a href="/help" className="text-xs text-ink-3 hover:text-ink-1 transition-colors">Help</a>
+          <a href="/about" className="text-xs text-ink-3 hover:text-ink-1 transition-colors">About</a>
           <a href="/auth"
              className="text-xs text-ink-3 hover:text-ink-1 transition-colors">
             Sign in
@@ -107,167 +125,192 @@ export function ExplorePage() {
           </div>
         )}
 
-        {/* Topics grid */}
-        {!loading && topics.length > 0 && (
-          <section className="mb-12">
-            {filter === 'all' && (
-              <h2 className="text-sm font-semibold text-ink-1 mb-4 flex items-center gap-2">
-                🧠 Wiki Topics
-                <span className="text-[11px] text-ink-4 font-normal">
-                  ({topics.length})
-                </span>
-              </h2>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
-                            xl:grid-cols-4 gap-4">
-              {topics.map((topic: any) => (
-                <a key={topic.id}
-                   href={`/p/${topic.username}/topic/${topic.slug}`}
-                   className="group bg-surface-2 border border-surface-4 rounded-2xl
-                              overflow-hidden hover:border-brand/30 hover:shadow-lg
-                              hover:shadow-black/20 transition-all hover:-translate-y-0.5">
-                  <div className="h-1" style={{ background: topic.cover_color }} />
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-2xl">{topic.emoji}</span>
-                      <span className="text-[10px] text-ink-5">
-                        {topic.ref_count} refs
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-ink-1 mb-1
-                                  group-hover:text-brand-bright transition-colors
-                                  line-clamp-2">
-                      {topic.title}
-                    </p>
-                    {topic.summary && (
-                      <p className="text-[10px] text-ink-4 line-clamp-2
-                                    leading-relaxed">
-                        {topic.summary}
-                      </p>
-                    )}
-                    <p className="text-[9px] text-ink-5 mt-2">
-                      by {topic.user_name || topic.username}
-                    </p>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Collections grid */}
-        {!loading && collections.length > 0 && (
-          <section className="mb-12">
-            {filter === 'all' && (
-              <h2 className="text-sm font-semibold text-ink-1 mb-4 flex items-center gap-2">
-                📁 Collections
-                <span className="text-[11px] text-ink-4 font-normal">
-                  ({collections.length})
-                </span>
-              </h2>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {collections.map((col: any) => (
-                <a key={col.id}
-                   href={`/p/${col.username}/collection/${col.slug}`}
-                   className="group flex items-center gap-3 p-4 bg-surface-2
-                              border border-surface-4 rounded-2xl
-                              hover:border-brand/30 hover:shadow-lg
-                              hover:shadow-black/20 transition-all
-                              hover:-translate-y-0.5">
-                  <div className="w-10 h-10 rounded-xl flex items-center
-                                  justify-center text-xl flex-shrink-0"
-                       style={{ background: col.color + '20',
-                                border: `1px solid ${col.color}30` }}>
-                    {col.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-ink-1 truncate
-                                  group-hover:text-brand-bright transition-colors">
-                      {col.name}
-                    </p>
-                    <p className="text-[10px] text-ink-4">
-                      {col.bookmark_count} bookmarks
-                      <span className="mx-1">·</span>
-                      by {col.user_name || col.username}
-                    </p>
-                  </div>
-                  <svg className="w-3.5 h-3.5 text-ink-5 group-hover:text-ink-3
-                                  transition-colors flex-shrink-0" fill="none"
-                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Bookmarks masonry */}
-        {!loading && bookmarks.length > 0 && (
-          <section>
-            {filter === 'all' && (
-              <h2 className="text-sm font-semibold text-ink-1 mb-4 flex items-center gap-2">
-                🔖 Bookmarks
-                <span className="text-[11px] text-ink-4 font-normal">
-                  ({bookmarks.length})
-                </span>
-              </h2>
-            )}
-            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
-              {bookmarks.map((b: any) => {
-                let domain = ''
-                try { domain = new URL(b.url).hostname.replace('www.', '') } catch {}
-                const img = b.screenshot_url ?? b.og_image_url
-
-                return (
-                  <a key={b.id}
-                     href={`/p/b/${b.public_slug}`}
-                     className="group block break-inside-avoid mb-4 bg-surface-2
-                                border border-surface-4 rounded-2xl overflow-hidden
-                                hover:border-brand/30 hover:shadow-lg
-                                hover:shadow-black/20 transition-all
-                                hover:-translate-y-0.5">
-                    {img && (
-                      <div className="w-full overflow-hidden bg-surface-3">
-                        <img src={img} alt=""
-                             className="w-full object-cover group-hover:scale-105
-                                        transition-transform duration-300"
-                             onError={e => (e.currentTarget.parentElement!.style.display = 'none')} />
-                      </div>
-                    )}
-                    <div className="p-3">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        {b.favicon_url && (
-                          <img src={b.favicon_url} alt="" className="w-3.5 h-3.5"
-                               onError={e => (e.currentTarget.style.display = 'none')} />
-                        )}
-                        <span className="text-[10px] text-ink-4 truncate">
-                          {domain}
-                        </span>
-                      </div>
-                      <p className="text-xs font-medium text-ink-1 line-clamp-2
-                                    group-hover:text-brand-bright transition-colors
-                                    mb-1">
-                        {b.title || domain}
-                      </p>
-                      {b.description && (
-                        <p className="text-[10px] text-ink-4 line-clamp-2
-                                      leading-relaxed">
-                          {b.description}
-                        </p>
-                      )}
-                      <p className="text-[9px] text-ink-5 mt-2">
-                        by {b.user_name || b.username}
-                      </p>
-                    </div>
-                  </a>
-                )
-              })}
-            </div>
-          </section>
+        {/* Unified Pinterest masonry feed */}
+        {!loading && hasContent && (
+          <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+            {feed.map((item, i) => (
+              <div key={`${item.kind}-${item.data.id}-${i}`}
+                   className="break-inside-avoid mb-4">
+                {item.kind === 'topic'      && <TopicCard      t={item.data} />}
+                {item.kind === 'collection' && <CollectionCard c={item.data} />}
+                {item.kind === 'bookmark'   && <BookmarkCard   b={item.data} />}
+              </div>
+            ))}
+          </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-surface-4 px-6 py-6">
+        <div className="max-w-6xl mx-auto flex items-center justify-between
+                        text-[11px] text-ink-4">
+          <span>© {new Date().getFullYear()} Memex</span>
+          <div className="flex items-center gap-4">
+            <a href="/about"    className="hover:text-ink-2 transition-colors">About</a>
+            <a href="/help"     className="hover:text-ink-2 transition-colors">Help</a>
+            <a href="/feedback" className="hover:text-ink-2 transition-colors">Feedback</a>
+          </div>
+        </div>
+      </footer>
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Author chip — shown at the bottom of every card
+// ─────────────────────────────────────────────
+function AuthorChip({ username, name, avatarUrl }: {
+  username: string; name?: string; avatarUrl?: string
+}) {
+  const initial = (name || username || '?')[0].toUpperCase()
+  return (
+    <a href={`/p/${username}`}
+       onClick={e => e.stopPropagation()}
+       className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+      <div className="w-4 h-4 rounded-full overflow-hidden bg-brand/20
+                      flex items-center justify-center flex-shrink-0">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[8px] font-bold text-brand-bright">{initial}</span>
+        )}
+      </div>
+      <span className="text-[10px] text-ink-4 truncate">
+        {name || username}
+      </span>
+    </a>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Topic card
+// ─────────────────────────────────────────────
+function TopicCard({ t }: { t: any }) {
+  return (
+    <a href={`/p/${t.username}/topic/${t.slug}`}
+       className="group block bg-surface-2 border border-surface-4 rounded-2xl
+                  overflow-hidden hover:border-brand/30 hover:shadow-lg
+                  hover:shadow-black/20 transition-all hover:-translate-y-0.5">
+      {/* Cover */}
+      <div className="h-20 flex items-center justify-center relative overflow-hidden"
+           style={{ background: `linear-gradient(135deg, ${t.cover_color}25, ${t.cover_color}05)` }}>
+        <span className="text-4xl">{t.emoji}</span>
+        <span className="absolute top-2 right-2 text-[9px] px-2 py-0.5
+                         bg-surface-2/80 text-ink-3 rounded-full border border-surface-4">
+          🧠 Wiki
+        </span>
+      </div>
+      <div className="p-4">
+        <p className="text-sm font-semibold text-ink-1 mb-1 line-clamp-2
+                      group-hover:text-brand-bright transition-colors">
+          {t.title}
+        </p>
+        {t.summary && (
+          <p className="text-[11px] text-ink-4 line-clamp-3 leading-relaxed mb-3">
+            {t.summary}
+          </p>
+        )}
+        <div className="flex items-center justify-between pt-2 border-t border-surface-4">
+          <AuthorChip username={t.username} name={t.user_name} avatarUrl={t.avatar_url} />
+          <span className="text-[9px] text-ink-5">
+            {new Date(t.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+      </div>
+    </a>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Collection card
+// ─────────────────────────────────────────────
+function CollectionCard({ c }: { c: any }) {
+  return (
+    <a href={`/p/${c.username}/collection/${c.slug}`}
+       className="group block bg-surface-2 border border-surface-4 rounded-2xl
+                  overflow-hidden hover:border-brand/30 hover:shadow-lg
+                  hover:shadow-black/20 transition-all hover:-translate-y-0.5">
+      {/* Cover */}
+      <div className="h-20 flex items-center justify-center relative overflow-hidden"
+           style={{ background: `linear-gradient(135deg, ${c.color}25, ${c.color}05)` }}>
+        <span className="text-4xl">{c.icon}</span>
+        <span className="absolute top-2 right-2 text-[9px] px-2 py-0.5
+                         bg-surface-2/80 text-ink-3 rounded-full border border-surface-4">
+          📁 Collection
+        </span>
+      </div>
+      <div className="p-4">
+        <p className="text-sm font-semibold text-ink-1 mb-1 line-clamp-2
+                      group-hover:text-brand-bright transition-colors">
+          {c.name}
+        </p>
+        {c.description ? (
+          <p className="text-[11px] text-ink-4 line-clamp-2 leading-relaxed mb-2">
+            {c.description}
+          </p>
+        ) : (
+          <p className="text-[11px] text-ink-4 mb-2">
+            {c.bookmark_count} bookmark{c.bookmark_count === 1 ? '' : 's'}
+          </p>
+        )}
+        <div className="flex items-center justify-between pt-2 border-t border-surface-4">
+          <AuthorChip username={c.username} name={c.user_name} avatarUrl={c.avatar_url} />
+          <span className="text-[9px] text-ink-5">
+            {c.bookmark_count} saved
+          </span>
+        </div>
+      </div>
+    </a>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Bookmark card — Pinterest style with image
+// ─────────────────────────────────────────────
+function BookmarkCard({ b }: { b: any }) {
+  let domain = ''
+  try { domain = new URL(b.url).hostname.replace('www.', '') } catch {}
+  const img = b.screenshot_url ?? b.og_image_url
+
+  return (
+    <a href={`/p/b/${b.public_slug}`}
+       className="group block bg-surface-2 border border-surface-4 rounded-2xl
+                  overflow-hidden hover:border-brand/30 hover:shadow-lg
+                  hover:shadow-black/20 transition-all hover:-translate-y-0.5">
+      {img ? (
+        <div className="w-full overflow-hidden bg-surface-3">
+          <img src={img} alt=""
+               className="w-full object-cover group-hover:scale-105
+                          transition-transform duration-300"
+               onError={e => (e.currentTarget.parentElement!.style.display = 'none')} />
+        </div>
+      ) : (
+        <div className="h-20 flex items-center justify-center bg-surface-3">
+          <span className="text-3xl opacity-40">🔖</span>
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          {b.favicon_url && (
+            <img src={b.favicon_url} alt="" className="w-3.5 h-3.5 flex-shrink-0"
+                 onError={e => (e.currentTarget.style.display = 'none')} />
+          )}
+          <span className="text-[10px] text-ink-4 truncate">{domain}</span>
+        </div>
+        <p className="text-xs font-medium text-ink-1 line-clamp-2
+                      group-hover:text-brand-bright transition-colors mb-1">
+          {b.title || domain}
+        </p>
+        {b.description && (
+          <p className="text-[10px] text-ink-4 line-clamp-2 leading-relaxed mb-2">
+            {b.description}
+          </p>
+        )}
+        <div className="flex items-center justify-between pt-2 border-t border-surface-4">
+          <AuthorChip username={b.username} name={b.user_name} avatarUrl={b.avatar_url} />
+          <span className="text-[9px] text-ink-5">🔖</span>
+        </div>
+      </div>
+    </a>
   )
 }
