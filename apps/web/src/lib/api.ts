@@ -289,3 +289,12 @@ export const attachmentsApi = {
     })
   },
 }
+
+export const feedbackApi = {
+  async submit(input: { email?: string; category: string; message: string }) {
+    return apiFetch('/api/feedback', {
+      method: 'POST',
+      body:   JSON.stringify(input),
+    })
+  },
+}

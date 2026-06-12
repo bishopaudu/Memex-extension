@@ -15,6 +15,7 @@ import publicRouter      from './routes/public'
 import readingRouter     from './routes/reading'
 import digestRouter      from './routes/digest'
 import adminRouter       from './routes/admin'
+import feedbackRouter    from './routes/feedback'
 
 const app = new Hono()
 
@@ -44,6 +45,7 @@ app.route('/api/attachments', attachmentsRouter)
 app.route('/api/reading',     readingRouter)
 app.route('/api/digest',      digestRouter)
 app.route('/api/admin',       adminRouter)
+app.route('/api/feedback',    feedbackRouter)
 app.route('/p',               publicRouter)
 
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))

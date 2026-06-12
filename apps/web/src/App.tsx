@@ -10,6 +10,9 @@ import { PublicCollectionPage } from './pages/PublicCollectionPage'
 import { AdminPage } from './pages/AdminPage'
 import { PublicBookmarkPage } from './pages/PublicBookmarkPage'
 import { ExplorePage } from './pages/ExplorePage'
+import { HelpPage }             from './pages/HelpPage'
+import { AboutPage }            from './pages/AboutPage'
+import { FeedbackPage }         from './pages/FeedbackPage'
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { auth } = useAuth()
 
@@ -43,6 +46,9 @@ export default function App() {
         <Route path="/p/:username/collection/:slug" element={<PublicCollectionPage />} />
           <Route path="/p/b/:slug" element={<PublicBookmarkPage />} />
   <Route path="/explore" element={<ExplorePage />} />
+   <Route path="/help"                            element={<HelpPage />} />
+        <Route path="/about"                           element={<AboutPage />} />
+        <Route path="/feedback"                        element={<FeedbackPage />} />
         <Route path="/admin" element={<AdminPage />} />
 
         <Route

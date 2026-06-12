@@ -266,3 +266,15 @@ export const readingListRelations = relations(readingList, ({ one }) => ({
   user:     one(users,     { fields: [readingList.userId],     references: [users.id] }),
   bookmark: one(bookmarks, { fields: [readingList.bookmarkId], references: [bookmarks.id] }),
 }))
+
+// ─────────────────────────────────────────────
+// FEEDBACK
+// ─────────────────────────────────────────────
+export const feedback = pgTable('feedback', {
+  id:        uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId:    uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  email:     text('email'),
+  category:  text('category').notNull().default('general'),
+  message:   text('message').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})

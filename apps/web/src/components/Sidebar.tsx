@@ -273,8 +273,8 @@ export function Sidebar({
         )}
       </nav>
 
-      {/* Explore link */}
-      <div className="px-2 pb-2">
+      {/* Explore + Help links */}
+      <div className="px-2 pb-2 flex flex-col gap-0.5">
         <a href="/explore" target="_blank"
            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md
                       text-xs text-ink-4 hover:text-ink-2 hover:bg-surface-3
@@ -287,6 +287,20 @@ export function Sidebar({
             <polyline points="15 3 21 3 21 9"/>
             <line x1="10" y1="14" x2="21" y2="3"/>
           </svg>
+        </a>
+        <a href="/help" target="_blank"
+           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md
+                      text-xs text-ink-4 hover:text-ink-2 hover:bg-surface-3
+                      transition-colors">
+          <span className="text-sm">❓</span>
+          Help & guides
+        </a>
+        <a href="/feedback" target="_blank"
+           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md
+                      text-xs text-ink-4 hover:text-ink-2 hover:bg-surface-3
+                      transition-colors">
+          <span className="text-sm">💬</span>
+          Send feedback
         </a>
       </div>
 
