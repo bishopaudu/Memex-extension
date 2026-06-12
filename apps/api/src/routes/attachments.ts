@@ -167,4 +167,34 @@ attachmentsRouter.delete('/:id', async (c) => {
   return c.json({ data: { success: true }, error: null })
 })
 
+
+// ─────────────────────────────────────────────
+// PATCH /attachments/:id — update text content
+// ─────────────────────────────────────────────
+const updateSchema = z.object({
+  content: z.string(),
+})
+
+attachmentsRouter.patch('/:id', zValidator('json', updateSchema), async (c) => {
+  const userId = c.get('userId')
+  const id     = c.req.param('id')
+  const { content } = c.req.valid('json')
+
+  const [existing] = await db
+    .select({ id: attachments.id })
+    .from(attachments)
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
+    .limit(1)
+
+  if (!existing) {
+    return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Attachment not found' } }, 404)
+  }
+
+  await db.update(attachments)
+    .set({ content })
+    .where(eq(attachments.id, id))
+
+  return c.json({ data: { success: true }, error: null })
+})
+
 export default attachmentsRouter

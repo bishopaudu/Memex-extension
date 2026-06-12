@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import { FormattedText } from '../lib/textFormat'
 
 export function PublicBookmarkPage() {
   const { slug }   = useParams<{ slug: string }>()
@@ -195,10 +196,9 @@ export function PublicBookmarkPage() {
                      className="bg-surface-2 border border-surface-4
                                 rounded-xl overflow-hidden">
                   <div className="w-full h-0.5 bg-brand/40" />
-                  <p className="px-4 py-3 text-sm text-ink-1 leading-relaxed
-                                whitespace-pre-wrap">
-                    {note.content}
-                  </p>
+                  <div className="px-4 py-3">
+                    <FormattedText text={note.content ?? ''} />
+                  </div>
                 </div>
               ))}
             </div>

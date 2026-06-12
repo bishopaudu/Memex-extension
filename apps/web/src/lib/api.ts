@@ -280,3 +280,12 @@ export const adminApi = {
     return apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
   },
 }
+
+export const attachmentsApi = {
+  async update(id: string, content: string) {
+    return apiFetch(`/api/attachments/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify({ content }),
+    })
+  },
+}
