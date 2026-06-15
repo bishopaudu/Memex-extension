@@ -43,7 +43,7 @@ export function CollectionDetailPage({
       const newIsPublic = !collection.isPublic
       setCollection((prev: any) => prev ? { ...prev, isPublic: newIsPublic } : prev)
       if (newIsPublic) {
-        const meRes = await fetch('http://localhost:3001/api/auth/me', {
+        const meRes = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/auth/me`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
         })
         const meData = await meRes.json().catch(() => null)

@@ -134,7 +134,7 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
           </span>
         </div>
         <button onClick={onClose}
-                className="text-[#444] hover:text-[#999] transition-colors text-sm">
+                className="text-[#888888] hover:text-[#999] transition-colors text-sm">
           ×
         </button>
       </div>
@@ -221,7 +221,7 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
       {done.length > 0 && (
         <div className="mx-2 mb-2 px-3 py-2 bg-[#161616] border border-[#1e1e1e]
                         rounded-lg">
-          <p className="text-[10px] text-[#666]">
+          <p className="text-[10px] text-[#999999]">
             {done.length} extraction{done.length > 1 ? 's' : ''} added to attachments
           </p>
         </div>

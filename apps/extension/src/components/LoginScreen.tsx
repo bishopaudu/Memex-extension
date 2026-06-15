@@ -125,7 +125,7 @@ export function LoginScreen({ onLogin }: Props) {
               onFocus={() => {}}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="#2a2a2a" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
+                   stroke="#666666" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
@@ -162,7 +162,7 @@ export function LoginScreen({ onLogin }: Props) {
               padding: '0 12px',
             }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="#2a2a2a" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
+                   stroke="#666666" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                 <path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
@@ -192,7 +192,7 @@ export function LoginScreen({ onLogin }: Props) {
                   border: 'none',
                   cursor: 'pointer',
                   padding: '4px',
-                  color: showPass ? '#4f6ef7' : '#2a2a2a',
+                  color: showPass ? '#4f6ef7' : '#888888',
                   display: 'flex', alignItems: 'center',
                   transition: 'color 0.15s',
                 }}
@@ -285,7 +285,7 @@ export function LoginScreen({ onLogin }: Props) {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
-        input::placeholder { color: #2a2a2a; }
+        input::placeholder { color: #666666; }
         input:-webkit-autofill {
           -webkit-box-shadow: 0 0 0 100px #111 inset;
           -webkit-text-fill-color: #ccc;

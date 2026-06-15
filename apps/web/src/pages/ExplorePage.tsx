@@ -17,7 +17,7 @@ export function ExplorePage() {
   async function fetchExplore() {
     setLoading(true)
     try {
-      const r    = await fetch(`http://localhost:3001/p/explore?type=${filter}`)
+      const r    = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/p/explore?type=${filter}`)
       const json = await r.json()
       if (!json.error) setData(json.data)
     } catch {}

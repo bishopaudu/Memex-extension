@@ -13,7 +13,7 @@ export function PublicBookmarkPage() {
   async function fetchBookmark() {
     setLoading(true)
     try {
-      const r = await fetch(`http://localhost:3001/p/b/${slug}`)
+      const r = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/p/b/${slug}`)
       const json = await r.json()
       if (json.error) setNotFound(true)
       else setData(json.data)

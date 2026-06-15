@@ -292,7 +292,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
           <div className="text-center">
             <p className="text-sm font-semibold text-[#e2e2e2] mb-1">Saved to Memex</p>
-            <p className="text-[11px] text-[#444]">
+            <p className="text-[11px] text-[#aaaaaa]">
               {attachments.length > 0
                 ? uploading > 0
                   ? `Uploading ${uploading} attachment${uploading > 1 ? 's' : ''}...`
@@ -397,7 +397,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             <p className="text-[11px] font-medium text-[#ccc] truncate leading-tight">
               {pageInfo.title || 'Untitled page'}
             </p>
-            <p className="text-[10px] text-[#383838] truncate mt-0.5">
+            <p className="text-[10px] text-[#888888] truncate mt-0.5">
               {new URL(pageInfo.url).hostname.replace('www.', '')}
             </p>
           </div>
@@ -408,7 +408,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
         {/* Title */}
         <div>
-          <label className="block text-[10px] font-medium text-[#383838] uppercase
+          <label className="block text-[10px] font-medium text-[#888888] uppercase
                             tracking-wider mb-1.5">Title</label>
           <input
             type="text"
@@ -425,9 +425,9 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         {/* Smart tags */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[10px] font-medium text-[#383838] uppercase
+            <label className="text-[10px] font-medium text-[#888888] uppercase
                               tracking-wider">Tags</label>
-            <span className="text-[9px] text-[#2a2a2a]">
+            <span className="text-[9px] text-[#666666]">
               click to add • type to create new
             </span>
           </div>
@@ -436,7 +436,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
         {/* Attachments */}
         <div>
-          <label className="block text-[10px] font-medium text-[#383838] uppercase
+          <label className="block text-[10px] font-medium text-[#888888] uppercase
                             tracking-wider mb-1.5">
             Attachments
             {attachments.length > 0 && (
@@ -455,7 +455,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
               <div className="flex items-center gap-2 px-3 py-2 border-t border-[#1e1e1e]">
                 <span className="text-[10px] text-[#555] flex-1">Area selected</span>
                 <button onClick={() => setAreaPreview(null)}
-                        className="text-[10px] text-[#444] hover:text-[#888] px-2 py-1">
+                        className="text-[10px] text-[#aaaaaa] hover:text-[#888] px-2 py-1">
                   Discard
                 </button>
                 <button onClick={retryAreaSelect}
@@ -495,7 +495,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                   </div>
                   <button
                     onClick={() => removeAttachment(att.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[#333]
+                    className="opacity-0 group-hover:opacity-100 text-[#888888]
                                hover:text-red-400 p-1 transition-all"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
@@ -527,9 +527,9 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                            outline-none resize-none"
               />
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[9px] text-[#2a2a2a] flex-1">⌘↵ to add</span>
+                <span className="text-[9px] text-[#666666] flex-1">⌘↵ to add</span>
                 <button onClick={() => { setAddingText(false); setTextInput('') }}
-                        className="text-[10px] text-[#444] hover:text-[#888] px-2 py-1">
+                        className="text-[10px] text-[#aaaaaa] hover:text-[#888] px-2 py-1">
                   Cancel
                 </button>
                 <button onClick={addTextNote} disabled={!textInput.trim()}
@@ -619,12 +619,12 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           )}
         </button>
         {!areaPreview && (
-          <p className="text-center text-[9px] text-[#252525] mt-1.5">
+          <p className="text-center text-[9px] text-[#555555] mt-1.5">
             📸 Screenshot auto-captured on save
           </p>
         )}
         {areaPreview && (
-          <p className="text-center text-[9px] text-[#444] mt-1.5">
+          <p className="text-center text-[9px] text-[#aaaaaa] mt-1.5">
             Confirm or discard selection first
           </p>
         )}
@@ -643,7 +643,7 @@ function AttachBtn({ emoji, label, onClick, disabled, hint }: {
       disabled={disabled}
       title={hint}
       className="flex flex-col items-center gap-1.5 py-3 rounded-xl border
-                 bg-[#111] border-[#1a1a1a] hover:border-[#2a2a2a]
+                 bg-[#111] border-[#1a1a1a] hover:border-[#444444]
                  hover:bg-[#141414] transition-all disabled:opacity-40"
     >
       <span className="text-lg leading-none">{emoji}</span>
@@ -665,7 +665,7 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => chrome.tabs.create({ url: DASHBOARD_URL })}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] text-[#444]
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] text-[#aaaaaa]
                      bg-[#111] border border-[#1a1a1a] rounded-lg
                      hover:text-[#7b93ff] hover:border-[#4f6ef7]/30
                      transition-all"
@@ -682,7 +682,7 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
         <button
           onClick={onLogout}
           className="w-7 h-7 flex items-center justify-center rounded-lg
-                     text-[#2a2a2a] hover:text-[#666] hover:bg-[#111]
+                     text-[#666666] hover:text-[#666] hover:bg-[#111]
                      transition-colors"
           title="Sign out"
         >

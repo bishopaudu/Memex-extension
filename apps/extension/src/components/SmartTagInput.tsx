@@ -101,7 +101,7 @@ export function SmartTagInput({ tags, onChange }: Props) {
           onBlur={() => { if (input) addTag(input) }}
           placeholder={tags.length === 0 ? 'Type or pick tags below...' : ''}
           className="flex-1 min-w-[80px] text-[11px] bg-transparent outline-none
-                     text-[#e2e2e2] placeholder-[#333]"
+                     text-[#e2e2e2] placeholder-[#555555]"
         />
 
         {/* Inline suggestions dropdown */}
@@ -118,7 +118,7 @@ export function SmartTagInput({ tags, onChange }: Props) {
                            text-left"
               >
                 <span>{tag.name}</span>
-                <span className="text-[10px] text-[#444]">{tag.count}</span>
+                <span className="text-[10px] text-[#888888]">{tag.count}</span>
               </button>
             ))}
           </div>
@@ -134,17 +134,17 @@ export function SmartTagInput({ tags, onChange }: Props) {
               onClick={() => toggleExistingTag(tag.name)}
               className="flex items-center gap-1 px-2 py-1 text-[10px] rounded-md
                          border transition-all
-                         bg-[#111] border-[#1e1e1e] text-[#555]
+                         bg-[#111] border-[#1e1e1e] text-[#888888]
                          hover:border-[#4f6ef7]/40 hover:text-[#7b93ff]
                          hover:bg-[#1a1f3a]/30"
             >
-              <span className="text-[#333]">#</span>
+              <span className="text-[#777777]">#</span>
               {tag.name}
             </button>
           ))}
 
           {existingTags.filter(t => !tags.includes(t.name)).length > 8 && (
-            <span className="text-[10px] text-[#333] flex items-center px-1">
+            <span className="text-[10px] text-[#777777] flex items-center px-1">
               +{existingTags.filter(t => !tags.includes(t.name)).length - 8} more
             </span>
           )}
@@ -155,7 +155,7 @@ export function SmartTagInput({ tags, onChange }: Props) {
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 border border-[#333] border-t-[#555]
                           rounded-full animate-spin" />
-          <span className="text-[10px] text-[#333]">Loading your tags...</span>
+          <span className="text-[10px] text-[#777777]">Loading your tags...</span>
         </div>
       )}
     </div>
