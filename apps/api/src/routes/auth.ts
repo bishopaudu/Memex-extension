@@ -55,7 +55,14 @@ auth.post('/signup', zValidator('json', signupSchema), async (c) => {
       password: hashedPassword,
       name: name ?? null,
     })
-    .returning({ id: users.id, email: users.email, name: users.name, createdAt: users.createdAt })
+    .returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      username: users.username,
+      avatarUrl: users.avatarUrl,
+      createdAt: users.createdAt,
+    })
 
   // Create session
   const sessionId = nanoid(32)
@@ -76,7 +83,16 @@ auth.post('/signup', zValidator('json', signupSchema), async (c) => {
   })
 
   return c.json({
-    data: { user: { id: user.id, email: user.email, name: user.name }, token },
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+      },
+      token,
+    },
     error: null,
   }, 201)
 })
@@ -116,7 +132,13 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
 
   return c.json({
     data: {
-      user: { id: user.id, email: user.email, name: user.name },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+      },
       token,
     },
     error: null,
@@ -151,7 +173,7 @@ auth.get('/me', authMiddleware, async (c) => {
   const userId = c.get('userId')
 
   const [user] = await db
-    .select({ id: users.id, email: users.email, name: users.name, avatarUrl: users.avatarUrl, createdAt: users.createdAt })
+    .select({ id: users.id, email: users.email, name: users.name, username: users.username, avatarUrl: users.avatarUrl, createdAt: users.createdAt })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1)

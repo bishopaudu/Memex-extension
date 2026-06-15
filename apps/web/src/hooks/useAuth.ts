@@ -5,6 +5,9 @@ interface User {
   id: string
   email: string
   name: string | null
+  username: string | null
+  avatarUrl: string | null
+  createdAt?: string
 }
 
 type AuthState =

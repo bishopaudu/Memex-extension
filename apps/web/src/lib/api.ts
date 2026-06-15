@@ -104,6 +104,12 @@ export const collectionsApi = {
   async delete(id: string) {
     return apiFetch(`/api/collections/${id}`, { method: 'DELETE' })
   },
+  async update(id: string, input: Partial<{ name: string; color: string; icon: string; description: string; isPublic: boolean }>) {
+    return apiFetch<{ success: boolean; slug?: string; isPublic?: boolean }>(`/api/collections/${id}`, {
+      method: 'PATCH',
+      body:   JSON.stringify(input),
+    })
+  },
   async addBookmark(collectionId: string, bookmarkId: string) {
     return apiFetch(`/api/collections/${collectionId}/bookmarks`, {
       method: 'POST', body: JSON.stringify({ bookmarkId }),

@@ -3,13 +3,12 @@ import { profileApi } from '../lib/api'
 import { useToast } from './Toast'
 
 interface Props {
-  user:     { 
+  user:     {
     id: string; 
     email: string; 
-    //name?: string;
-   // username?: string
-     name?: string | null
+    name?: string | null
     username?: string | null
+    avatarUrl?: string | null
    }
   onClose:  () => void
   onUpdate: (user: any) => void
