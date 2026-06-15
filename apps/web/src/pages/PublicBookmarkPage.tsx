@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_BASE } from '../lib/config'
 import { useParams } from 'react-router-dom'
 import { FormattedText } from '../lib/textFormat'
 
@@ -13,7 +14,7 @@ export function PublicBookmarkPage() {
   async function fetchBookmark() {
     setLoading(true)
     try {
-      const r = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/p/b/${slug}`)
+      const r = await fetch(`${API_BASE}/p/b/${slug}`)
       const json = await r.json()
       if (json.error) setNotFound(true)
       else setData(json.data)

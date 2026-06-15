@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { API_BASE } from '../lib/config'
 import { topicsApi, bookmarksApi, authApi } from '../lib/api'
 
 interface Block {
@@ -549,7 +550,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
                   <div className="flex items-center gap-1 bg-surface-3 border
                                   border-surface-4 rounded-lg overflow-hidden">
                     <p className="text-[9px] text-ink-4 px-2 truncate flex-1 py-1.5">
-                      {shareUrl.replace('http://localhost:5173', '')}
+                      {shareUrl.replace(window.location.origin, '')}
                     </p>
                     <button
                       onClick={async () => {
@@ -571,7 +572,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
                       if (!updated.error) {
                         const slug = updated.data.topic.slug
                         try {
-                          const meRes = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/auth/me`, {
+                          const meRes = await fetch(`${API_BASE}/api/auth/me`, {
                             headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
                           })
                           const meData = await meRes.json()

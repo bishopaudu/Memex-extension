@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_BASE } from '../lib/config'
 import { collectionsApi } from '../lib/api'
 import { BookmarkCard }        from '../components/BookmarkCard'
 import { BookmarkDetailPage }  from './BookmarkDetailPage'
@@ -43,7 +44,7 @@ export function CollectionDetailPage({
       const newIsPublic = !collection.isPublic
       setCollection((prev: any) => prev ? { ...prev, isPublic: newIsPublic } : prev)
       if (newIsPublic) {
-        const meRes = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/auth/me`, {
+        const meRes = await fetch(`${API_BASE}/api/auth/me`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
         })
         const meData = await meRes.json().catch(() => null)
