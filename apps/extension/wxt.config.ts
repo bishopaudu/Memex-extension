@@ -15,5 +15,13 @@ export default defineConfig({
       default_popup: 'popup.html',
       default_title: 'Save to Memex',
     },
+    browser_specific_settings: {
+      gecko: {
+        id: 'memex-extension@johnaudu.com',
+        data_collection_permissions: {
+          required: ['none'],
+        },
+      },
+    },
   },
 })

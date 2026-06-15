@@ -4,6 +4,10 @@ services:
     runtime: static
     buildCommand: pnpm install && pnpm build
     staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://memexapi-production.up.railway.app/
