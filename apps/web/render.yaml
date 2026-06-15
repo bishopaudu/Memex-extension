@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: memex-web
+    runtime: static
+    buildCommand: pnpm install && pnpm build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://memexapi-production.up.railway.app/
