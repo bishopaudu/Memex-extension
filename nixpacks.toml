@@ -2,10 +2,7 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npm install -g pnpm", "pnpm install --frozen-lockfile"]
-
-[phases.build]
-cmds = ["echo 'Skipping build — tsx runs TypeScript directly'"]
+cmds = ["npm install -g pnpm@9", "cd apps/api && pnpm install"]
 
 [start]
-cmd = "cd apps/api && pnpm start"
+cmd = "cd apps/api && tsx src/index.ts"
