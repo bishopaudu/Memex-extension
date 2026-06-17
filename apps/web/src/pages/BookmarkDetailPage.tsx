@@ -42,7 +42,7 @@ interface Props {
 export function BookmarkDetailPage({ bookmarkId, onBack, onDelete, onTagClick }: Props) {
   const [bookmark,  setBookmark]  = useState<Bookmark | null>(null)
   const [loading,   setLoading]   = useState(true)
-  const [tab,       setTab]       = useState<Tab>('overview')
+  const [tab,       setTab]       = useState<Tab>('board')
   const [lightbox,  setLightbox]  = useState<string | null>(null)
   const [copied,       setCopied]       = useState(false)
   const [sharing,      setSharing]      = useState(false)
@@ -530,7 +530,7 @@ ${bookmark.url}`
                   ...a,
                   sortOrder: a.sortOrder ?? i,
                 }))}
-                onLightbox={url => { setLightboxUrl(url); setShowLightbox(true) }}
+                onLightbox={url => setLightbox(url)}
                 onDelete={async (id: string) => {
                   setBookmark(prev => prev ? {
                     ...prev,
