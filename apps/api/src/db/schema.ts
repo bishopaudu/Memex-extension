@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   boolean,
+  integer,
   timestamp,
   primaryKey,
   index,
@@ -158,6 +159,7 @@ export const attachments = pgTable('attachments', {
   url:        text('url'),                      // cloudinary URL for image/screenshot attachments
   storageKey: text('storage_key'),              // cloudinary public_id for deletion
   label:      text('label'),                    // optional user label e.g. "Key diagram"
+  sortOrder:  integer('sort_order').default(0), // for drag-to-reorder
   createdAt:  timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 

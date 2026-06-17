@@ -168,6 +168,32 @@ attachmentsRouter.delete('/:id', async (c) => {
 })
 
 
+
+// ─────────────────────────────────────────────
+// PATCH /attachments/reorder — bulk update sort order
+// Body: [{ id: string, sortOrder: number }]
+// ─────────────────────────────────────────────
+attachmentsRouter.patch('/reorder', async (c) => {
+  const userId = c.get('userId')
+  const items  = await c.req.json() as { id: string; sortOrder: number }[]
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return c.json({ data: null, error: { code: 'BAD_REQUEST', message: 'Items array required' } }, 400)
+  }
+
+  // Update each attachment's sort order — only if it belongs to this user
+  await Promise.all(items.map(item =>
+    db.update(attachments)
+      .set({ sortOrder: item.sortOrder })
+      .where(and(
+        eq(attachments.id,     item.id),
+        eq(attachments.userId, userId),
+      ))
+  ))
+
+  return c.json({ data: { success: true }, error: null })
+})
+
 // ─────────────────────────────────────────────
 // PATCH /attachments/:id — update text content
 // ─────────────────────────────────────────────

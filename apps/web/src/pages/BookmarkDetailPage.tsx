@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { bookmarksApi, attachmentsApi } from '../lib/api'
-import { FormattedText } from '../lib/textFormat'
+import { FormattedText }    from '../lib/textFormat'
+import { AttachmentBoard } from '../components/AttachmentBoard'
 
 interface Attachment {
   id:        string
@@ -29,7 +30,7 @@ interface Bookmark {
   updatedAt:     string
 }
 
-type Tab = 'overview' | 'screenshots' | 'images' | 'notes' | 'links'
+type Tab = 'board' | 'screenshots' | 'images' | 'notes' | 'links'
 
 interface Props {
   bookmarkId: string
@@ -217,24 +218,14 @@ ${bookmark.url}`
     setTimeout(() => setCopied(false), 2000)
   }
 
- /* const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'overview',    label: 'Overview',    count: 0 },
+ 
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: 'board',       label: '📋 Board',    count: atts.length },
     { key: 'screenshots', label: 'Screenshots', count: screenshots.length },
     { key: 'images',      label: 'Images',      count: extractedImages.length },
     { key: 'notes',       label: 'Notes',       count: textNotes.length + textExtract.length },
     { key: 'links',       label: 'Links',       count: extractedLinks.length },
-  ].filter(t => t.key === 'overview' || t.count > 0)*/
-  const allTabs: { key: Tab; label: string; count: number }[] = [
-  { key: 'overview',    label: 'Overview',    count: 0 },
-  { key: 'screenshots', label: 'Screenshots', count: screenshots.length },
-  { key: 'images',      label: 'Images',      count: extractedImages.length },
-  { key: 'notes',       label: 'Notes',       count: textNotes.length + textExtract.length },
-  { key: 'links',       label: 'Links',       count: extractedLinks.length },
-]
-
-const tabs = allTabs.filter(
-  t => t.key === 'overview' || t.count > 0
-)
+  ].filter(t => t.key === 'board' || t.count > 0)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-1">
@@ -532,106 +523,21 @@ const tabs = allTabs.filter(
         <div className="px-8 py-6">
 
           {/* OVERVIEW */}
-          {tab === 'overview' && (
-            <div className="max-w-3xl space-y-6">
-
-              {/* Attachment summary */}
-              {atts.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-ink-3 uppercase
-                                 tracking-wider mb-3">
-                    Attachments ({atts.length})
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {screenshots.map(att => (
-                      <div
-                        key={att.id}
-                        onClick={() => att.url && setLightbox(att.url)}
-                        className="group relative aspect-video bg-surface-3
-                                   rounded-xl overflow-hidden border border-surface-4
-                                   cursor-zoom-in hover:border-brand/30 transition-colors"
-                      >
-                        {att.url && (
-                          <img src={att.url} alt=""
-                               className="w-full h-full object-cover
-                                          group-hover:scale-105 transition-transform" />
-                        )}
-                        <div className="absolute inset-0 bg-black/0
-                                        group-hover:bg-black/20 transition-colors
-                                        flex items-center justify-center">
-                          <svg className="w-5 h-5 text-white opacity-0
-                                          group-hover:opacity-100 transition-opacity"
-                               fill="none" viewBox="0 0 24 24"
-                               stroke="currentColor" strokeWidth={2}>
-                            <circle cx="11" cy="11" r="8"/>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            <line x1="11" y1="8" x2="11" y2="14"/>
-                            <line x1="8"  y1="11" x2="14" y2="11"/>
-                          </svg>
-                        </div>
-                        <span className="absolute top-2 left-2 text-[9px] px-1.5 py-0.5
-                                         bg-black/60 text-white rounded-full">
-                          {att.type === 'area_screenshot' ? '✂️ Area' : '📸 Screenshot'}
-                        </span>
-                      </div>
-                    ))}
-
-                    {/* Text notes preview */}
-                    {textNotes.slice(0, 2).map(att => (
-                      <div key={att.id}
-                           className="aspect-video bg-brand/5 border border-brand/20
-                                      rounded-xl p-3 flex flex-col justify-between
-                                      cursor-pointer hover:bg-brand/10 transition-colors"
-                           onClick={() => setTab('notes')}>
-                        <span className="text-xl">📝</span>
-                        <p className="text-[10px] text-ink-3 line-clamp-3 leading-relaxed">
-                          {att.content?.slice(0, 100)}
-                        </p>
-                      </div>
-                    ))}
-
-                    {/* Extracted images count */}
-                    {extractedImages.length > 0 && (
-                      <div className="aspect-video bg-green-500/5 border border-green-500/20
-                                      rounded-xl p-3 flex flex-col items-center justify-center
-                                      gap-2 cursor-pointer hover:bg-green-500/10 transition-colors"
-                           onClick={() => setTab('images')}>
-                        <span className="text-2xl">🖼️</span>
-                        <p className="text-[10px] text-ink-3 text-center">
-                          {extractedImages.length} images extracted
-                        </p>
-                        <p className="text-[9px] text-ink-4">Click to view →</p>
-                      </div>
-                    )}
-
-                    {/* Extracted links count */}
-                    {extractedLinks.length > 0 && (
-                      <div className="aspect-video bg-amber-500/5 border border-amber-500/20
-                                      rounded-xl p-3 flex flex-col items-center justify-center
-                                      gap-2 cursor-pointer hover:bg-amber-500/10 transition-colors"
-                           onClick={() => setTab('links')}>
-                        <span className="text-2xl">🔗</span>
-                        <p className="text-[10px] text-ink-3 text-center">
-                          {extractedLinks.length} links extracted
-                        </p>
-                        <p className="text-[9px] text-ink-4">Click to view →</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* No attachments */}
-              {atts.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-center
-                                border border-dashed border-surface-5 rounded-2xl">
-                  <span className="text-4xl mb-3">📎</span>
-                  <p className="text-sm font-medium text-ink-2 mb-1">No attachments</p>
-                  <p className="text-xs text-ink-4 max-w-xs">
-                    Use the Memex extension to add screenshots, notes, or extracted content
-                  </p>
-                </div>
-              )}
+          {tab === 'board' && (
+            <div className="max-w-3xl">
+              <AttachmentBoard
+                attachments={atts.map((a: any, i: number) => ({
+                  ...a,
+                  sortOrder: a.sortOrder ?? i,
+                }))}
+                onLightbox={url => { setLightboxUrl(url); setShowLightbox(true) }}
+                onDelete={async (id: string) => {
+                  setBookmark(prev => prev ? {
+                    ...prev,
+                    attachments: prev.attachments.filter((a: any) => a.id !== id),
+                  } : prev)
+                }}
+              />
             </div>
           )}
 

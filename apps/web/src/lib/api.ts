@@ -294,6 +294,13 @@ export const attachmentsApi = {
       body:   JSON.stringify({ content }),
     })
   },
+
+  async reorder(items: { id: string; sortOrder: number }[]) {
+    return apiFetch('/api/attachments/reorder', {
+      method: 'PATCH',
+      body:   JSON.stringify(items),
+    })
+  },
 }
 
 export const feedbackApi = {
