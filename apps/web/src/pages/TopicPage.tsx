@@ -780,6 +780,19 @@ function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
   onChangeType:   (type: string) => void
   onAddBelow:     (type: string) => void
 }) {
+  // ── UNCONTROLLED ref ──────────────────────────────────────────
+  // We ONLY set the DOM content on initial mount (or when block.id changes,
+  // meaning a new block has been swapped in). We never write to the DOM
+  // again while the user is typing — that would destroy the cursor position.
+  const divRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (divRef.current) {
+      divRef.current.textContent = block.content
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [block.id]) // ← intentionally only on block.id, NOT block.content
+
   if (block.type === 'divider') {
     return (
       <div className="group flex items-center gap-2 py-2">
@@ -858,8 +871,9 @@ function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
         <span className="text-ink-4 mt-1 flex-shrink-0 text-xs">•</span>
       )}
 
-      {/* Editable content */}
+      {/* Editable content — UNCONTROLLED: React never re-writes innerHTML */}
       <div
+        ref={divRef}
         id={`block-${block.id}`}
         contentEditable
         suppressContentEditableWarning
@@ -887,11 +901,11 @@ function BlockEditor({ block, isActive, showMenu, onFocus, onBlur, onUpdate,
           : block.type === 'quote' ? 'Quote...'
           : 'Write something...'
         }
-        dangerouslySetInnerHTML={{ __html: block.content }}
       />
     </div>
   )
 }
+
 
 // ─────────────────────────────────────────────
 // Reference search + add
