@@ -229,22 +229,6 @@ topicsRouter.patch('/:id', zValidator('json', z.object({
       error: { code: 'NOT_FOUND', message: 'Topic not found' }
     }, 404)
   }
-    // ← INSERT HERE ↓
-  /*const updateData: Record<string, any> = { ...input, updatedAt: new Date() }
-  if (input.isPublic === true) {
-    const [full] = await db
-      .select({ slug: topics.slug, title: topics.title })
-      .from(topics)
-      .where(eq(topics.id, id))
-      .limit(1)
-    if (!full.slug) {
-      updateData.slug = full.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '') + '-' + id.slice(0, 6)
-    }
-  } */
-  // ← INSERT ENDS ↑
 
   const updates: any = { ...input, updatedAt: new Date() }
 
@@ -263,10 +247,8 @@ topicsRouter.patch('/:id', zValidator('json', z.object({
   await db
     .update(topics)
     .set(updates)
-    //.set({ ...input, updatedAt: new Date() })
     .where(eq(topics.id, id))
 
- // return c.json({ data: { success: true }, error: null })
  const [updated] = await db
     .select({ slug: topics.slug, isPublic: topics.isPublic })
     .from(topics)
