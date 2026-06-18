@@ -225,7 +225,11 @@ ${bookmark.url}`
     { key: 'images',      label: 'Images',      count: extractedImages.length },
     { key: 'notes',       label: 'Notes',       count: textNotes.length + textExtract.length },
     { key: 'links',       label: 'Links',       count: extractedLinks.length },
-  ].filter(t => t.key === 'board' || t.count > 0)
+  ].filter(t => t.key === 'board' || t.count > 0) as {
+    key: Tab
+    label: string
+    count: number
+  }[]
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface-1">
