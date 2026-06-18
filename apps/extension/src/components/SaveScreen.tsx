@@ -4,7 +4,7 @@ import { SmartTagInput }  from './SmartTagInput'
 import { ExtractPanel }  from './ExtractPanel'
 import { cropImage } from '../lib/crop'
 
-const DASHBOARD_URL = 'http://localhost:5173'
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5173'
 
 interface PageInfo {
   url: string; title: string
@@ -51,30 +51,30 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   }, [])
 
   async function checkPendingAreaScreenshot() {
-    const result = await chrome.storage.local.get('pendingAreaScreenshot')
+    const result = await browser.storage.local.get('pendingAreaScreenshot') as { pendingAreaScreenshot?: any }
     const pending = result.pendingAreaScreenshot
     if (!pending) return
     if (Date.now() - pending.timestamp > 60_000) {
-      await chrome.storage.local.remove('pendingAreaScreenshot')
+      await browser.storage.local.remove('pendingAreaScreenshot')
       return
     }
     try {
       const cropped = await cropImage(pending.fullDataUrl, pending.region)
       setAreaPreview({ dataUrl: cropped })
-      await chrome.storage.local.remove('pendingAreaScreenshot')
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id })
+      await browser.storage.local.remove('pendingAreaScreenshot')
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+      if (tab?.id) browser.action.setBadgeText({ text: '', tabId: tab.id })
     } catch {
-      await chrome.storage.local.remove('pendingAreaScreenshot')
+      await browser.storage.local.remove('pendingAreaScreenshot')
     }
   }
 
   async function checkPendingHighlight() {
-    const result = await chrome.storage.local.get('pendingHighlight')
+    const result = await browser.storage.local.get('pendingHighlight') as { pendingHighlight?: any }
     const pending = result.pendingHighlight
     if (!pending) return
     if (Date.now() - pending.timestamp > 60_000) {
-      await chrome.storage.local.remove('pendingHighlight')
+      await browser.storage.local.remove('pendingHighlight')
       return
     }
     setPendingHighlight(pending)
@@ -85,14 +85,14 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
       content: `"${pending.text}"`,
       status:  'pending',
     }])
-    await chrome.storage.local.remove('pendingHighlight')
+    await browser.storage.local.remove('pendingHighlight')
     // Clear badge
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (tab?.id) chrome.action.setBadgeText({ text: '', tabId: tab.id })
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    if (tab?.id) browser.action.setBadgeText({ text: '', tabId: tab.id })
   }
 
   async function getCurrentTabInfo() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (!tab?.url || !tab?.id) return
     if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return
 
@@ -104,14 +104,14 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     setTitle(tab.title ?? '')
 
     try {
-      const meta = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_METADATA' })
+      const meta = await browser.tabs.sendMessage(tab.id, { type: 'GET_PAGE_METADATA' })
       if (meta) { setPageInfo({ ...base, ...meta }); setTitle(meta.title || tab.title || '') }
     } catch { /* use base */ }
   }
 
   async function addFullScreenshot() {
     try {
-      const dataUrl = await chrome.tabs.captureVisibleTab(undefined, { format: 'png', quality: 90 })
+      const dataUrl = await browser.tabs.captureVisibleTab({ format: 'png', quality: 90 })
       setAttachments(prev => [...prev, {
         id: crypto.randomUUID(), type: 'screenshot', preview: dataUrl, status: 'pending',
       }])
@@ -119,10 +119,10 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   }
 
   async function startAreaSelect() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
     if (!tab?.id) return
     setSelectingArea(true)
-    chrome.runtime.sendMessage({ type: 'START_AREA_SELECT_BG', tabId: tab.id })
+    browser.runtime.sendMessage({ type: 'START_AREA_SELECT_BG', tabId: tab.id })
     setTimeout(() => window.close(), 400)
   }
 
@@ -162,8 +162,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     // captureVisibleTab only works while the tab is still active
     let autoScreenshotDataUrl: string | null = null
     try {
-      autoScreenshotDataUrl = await chrome.tabs.captureVisibleTab(
-        undefined,
+      autoScreenshotDataUrl = await browser.tabs.captureVisibleTab(
         { format: 'png', quality: 85 }
       )
     } catch {
@@ -256,7 +255,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
   if (!pageInfo) {
     return (
-      <div className="flex flex-col h-full bg-[#0a0a0a]">
+      <div className="flex flex-col min-h-[480px] bg-[#0a0a0a]">
         <TopBar onLogout={onLogout} />
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-[#4f6ef7] border-t-transparent
@@ -341,7 +340,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           )}
 
           <button
-            onClick={() => chrome.tabs.create({ url: DASHBOARD_URL })}
+            onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
             className="w-full flex items-center justify-center gap-2 py-2.5 mt-2
                        bg-[#111] border border-[#1e1e1e] rounded-xl text-xs
                        text-[#666] hover:border-[#4f6ef7]/30 hover:text-[#7b93ff]
@@ -664,7 +663,7 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={() => chrome.tabs.create({ url: DASHBOARD_URL })}
+          onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
           className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] text-[#aaaaaa]
                      bg-[#111] border border-[#1a1a1a] rounded-lg
                      hover:text-[#7b93ff] hover:border-[#4f6ef7]/30

@@ -7,8 +7,8 @@ export default function App() {
 
   if (auth.status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent
+      <div className="flex items-center justify-center min-h-[480px] bg-[#0a0a0a]">
+        <div className="w-5 h-5 border-2 border-[#4f6ef7] border-t-transparent
                         rounded-full animate-spin" />
       </div>
     )

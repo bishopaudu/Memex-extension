@@ -48,7 +48,7 @@ export function CollectionDetailPage({
           headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
         })
         const meData = await meRes.json().catch(() => null)
-        const username = meData?.data?.user?.username ?? 'user'
+        const username = meData?.data?.user?.username || meData?.data?.user?.email?.split('@')[0] || 'user'
         // Get slug from updated collection
         const updated = await collectionsApi.getOne(collection.id)
         if (!updated.error) {

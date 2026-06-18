@@ -4,7 +4,7 @@ export default defineContentScript({
   main() {
 
     // ── Page metadata ──
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
       if (message.type === 'GET_PAGE_METADATA') {
         sendResponse({
@@ -99,13 +99,13 @@ function extractText(): { content: string; excerpt: string; readingTime: number 
     ]
 
     const main = candidates.find(el => el && el.textContent && el.textContent.length > 200)
-    const raw  = main?.innerText ?? doc.body?.innerText ?? ''
+    const raw  = (main as HTMLElement)?.innerText ?? doc.body?.innerText ?? ''
 
     // Clean up whitespace
     const content = raw
       .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0)
+      .map((l: string) => l.trim())
+      .filter((l: string) => l.length > 0)
       .join('\n')
       .slice(0, 8000)
 

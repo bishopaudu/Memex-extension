@@ -1,16 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 export async function getToken(): Promise<string | null> {
-  const result = await chrome.storage.local.get('token')
+  const result = await browser.storage.local.get('token') as { token?: string }
   return result.token ?? null
 }
 
 export async function setToken(token: string): Promise<void> {
-  await chrome.storage.local.set({ token })
+  await browser.storage.local.set({ token })
 }
 
 export async function clearToken(): Promise<void> {
-  await chrome.storage.local.remove('token')
+  await browser.storage.local.remove('token')
 }
 
 async function apiFetch<T>(

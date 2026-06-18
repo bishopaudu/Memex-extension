@@ -1,6 +1,6 @@
 {
   "name": "@memex/extension",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",

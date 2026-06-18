@@ -204,7 +204,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
           try {
             const meRes = await authApi.me()
             if (!meRes.error) {
-              username = meRes.data.user.username ?? meRes.data.user.email.split('@')[0]
+              username = meRes.data.user.username || meRes.data.user.email.split('@')[0] || 'user'
             }
           } catch {}
 
@@ -576,7 +576,7 @@ export function TopicPage({ topicId, allTopics, onBack, onDelete }: Props) {
                             headers: { Authorization: `Bearer ${localStorage.getItem('memex_token') ?? ''}` }
                           })
                           const meData = await meRes.json()
-                          const username = meData?.data?.user?.username ?? 'user'
+                          const username = meData?.data?.user?.username || meData?.data?.user?.email?.split('@')[0] || 'user'
                           setShareUrl(`${window.location.origin}/p/${username}/topic/${slug}`)
                         } catch {
                           setShareUrl(`${window.location.origin}/p/user/topic/${slug}`)

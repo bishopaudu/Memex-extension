@@ -14,22 +14,27 @@ export function useAuth() {
   }, [])
 
   async function checkAuth() {
-    const token = await getToken()
+    try {
+      const token = await getToken()
 
-    if (!token) {
+      if (!token) {
+        setAuth({ status: 'unauthenticated' })
+        return
+      }
+
+      const result = await authApi.me()
+
+      if (result.error) {
+        await clearToken()
+        setAuth({ status: 'unauthenticated' })
+        return
+      }
+
+      setAuth({ status: 'authenticated', user: result.data.user })
+    } catch (err) {
+      console.error('[Memex] Auth initialization failed:', err)
       setAuth({ status: 'unauthenticated' })
-      return
     }
-
-    const result = await authApi.me()
-
-    if (result.error) {
-      await clearToken()
-      setAuth({ status: 'unauthenticated' })
-      return
-    }
-
-    setAuth({ status: 'authenticated', user: result.data.user })
   }
 
   async function login(email: string, password: string) {

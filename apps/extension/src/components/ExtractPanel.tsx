@@ -63,10 +63,10 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
     setError(null)
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
       if (!tab?.id) throw new Error('No active tab')
 
-      const result: ExtractResult = await chrome.tabs.sendMessage(tab.id, {
+      const result: ExtractResult = await browser.tabs.sendMessage(tab.id, {
         type: 'EXTRACT_CONTENT',
         extractType: type,
       })

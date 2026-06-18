@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const DASHBOARD_URL = 'http://localhost:5173'
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5173'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<{ error: string | null }>
@@ -52,7 +52,7 @@ export function LoginScreen({ onLogin }: Props) {
           </span>
         </div>
         <button
-          onClick={() => chrome.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
+          onClick={() => browser.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
           style={{
             background: '#111',
             border: '0.5px solid #1a1a1a',
@@ -269,7 +269,7 @@ export function LoginScreen({ onLogin }: Props) {
         <p style={{ fontSize: 10, color: '#252525', marginTop: 16, textAlign: 'center' }}>
           No account?{' '}
           <button
-            onClick={() => chrome.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
+            onClick={() => browser.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
             style={{
               background: 'none', border: 'none',
               color: '#4f6ef7', cursor: 'pointer',
