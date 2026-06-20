@@ -27,7 +27,7 @@ export function LoginScreen({ onLogin }: Props) {
       display: 'flex',
       flexDirection: 'column',
       minHeight: 480,
-      background: '#0a0a0a',
+      background: '#12172a',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     }}>
 
@@ -42,22 +42,22 @@ export function LoginScreen({ onLogin }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 26, height: 26,
-            background: '#4f6ef7',
+            background: '#4B6BF5',
             borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700, color: 'white',
           }}>M</div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#ccc', letterSpacing: -0.2 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', letterSpacing: -0.2 }}>
             Memex
           </span>
         </div>
         <button
           onClick={() => browser.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
           style={{
-            background: '#111',
+            background: '#1f2640',
             border: '0.5px solid #1a1a1a',
             borderRadius: 8,
-            color: '#444',
+            color: '#aaaaaa',
             fontSize: 10,
             padding: '5px 10px',
             cursor: 'pointer',
@@ -95,12 +95,12 @@ export function LoginScreen({ onLogin }: Props) {
           marginBottom: 16,
         }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-               stroke="#4f6ef7" strokeWidth="1.5">
+               stroke="#4B6BF5" strokeWidth="1.5">
             <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
           </svg>
         </div>
 
-        <p style={{ fontSize: 15, fontWeight: 600, color: '#e2e2e2', margin: '0 0 4px' }}>
+        <p style={{ fontSize: 15, fontWeight: 600, color: '#f0f0f0', margin: '0 0 4px' }}>
           Sign in to Memex
         </p>
         <p style={{ fontSize: 11, color: '#3a3a3a', margin: '0 0 24px' }}>
@@ -116,7 +116,7 @@ export function LoginScreen({ onLogin }: Props) {
             </label>
             <div style={{
               display: 'flex', alignItems: 'center',
-              background: '#111',
+              background: '#1f2640',
               border: '0.5px solid #1e1e1e',
               borderRadius: 10,
               padding: '0 12px',
@@ -125,7 +125,7 @@ export function LoginScreen({ onLogin }: Props) {
               onFocus={() => {}}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="#666666" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
+                   stroke="#8888a0" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
@@ -141,7 +141,7 @@ export function LoginScreen({ onLogin }: Props) {
                   border: 'none',
                   outline: 'none',
                   fontSize: 12,
-                  color: '#ccc',
+                  color: '#f0f0f0',
                   padding: '9px 0',
                   fontFamily: 'inherit',
                 }}
@@ -156,13 +156,13 @@ export function LoginScreen({ onLogin }: Props) {
             </label>
             <div style={{
               display: 'flex', alignItems: 'center',
-              background: '#111',
+              background: '#1f2640',
               border: '0.5px solid #1e1e1e',
               borderRadius: 10,
               padding: '0 12px',
             }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="#666666" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
+                   stroke="#8888a0" strokeWidth="2" style={{ flexShrink: 0, marginRight: 8 }}>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                 <path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
@@ -178,7 +178,7 @@ export function LoginScreen({ onLogin }: Props) {
                   border: 'none',
                   outline: 'none',
                   fontSize: 12,
-                  color: '#ccc',
+                  color: '#f0f0f0',
                   padding: '9px 0',
                   fontFamily: 'inherit',
                 }}
@@ -192,7 +192,7 @@ export function LoginScreen({ onLogin }: Props) {
                   border: 'none',
                   cursor: 'pointer',
                   padding: '4px',
-                  color: showPass ? '#4f6ef7' : '#888888',
+                  color: showPass ? '#4B6BF5' : '#8888a0',
                   display: 'flex', alignItems: 'center',
                   transition: 'color 0.15s',
                 }}
@@ -235,7 +235,7 @@ export function LoginScreen({ onLogin }: Props) {
             style={{
               width: '100%',
               padding: '10px',
-              background: loading ? '#2a3a7a' : '#4f6ef7',
+              background: loading ? '#2a3a7a' : '#4B6BF5',
               border: 'none',
               borderRadius: 10,
               color: 'white',
@@ -266,13 +266,13 @@ export function LoginScreen({ onLogin }: Props) {
           </button>
         </form>
 
-        <p style={{ fontSize: 10, color: '#252525', marginTop: 16, textAlign: 'center' }}>
+        <p style={{ fontSize: 10, color: '#484868', marginTop: 16, textAlign: 'center' }}>
           No account?{' '}
           <button
             onClick={() => browser.tabs.create({ url: `${DASHBOARD_URL}/auth` })}
             style={{
               background: 'none', border: 'none',
-              color: '#4f6ef7', cursor: 'pointer',
+              color: '#4B6BF5', cursor: 'pointer',
               fontSize: 10, padding: 0, fontFamily: 'inherit',
             }}
           >

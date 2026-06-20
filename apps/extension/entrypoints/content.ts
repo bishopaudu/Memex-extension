@@ -366,3 +366,228 @@ function getFavicon(): string {
   }
   return `${window.location.origin}/favicon.ico`
 }
+
+// ─────────────────────────────────────────────
+// Floating inject button
+// Draggable, dismissible, always visible
+// ─────────────────────────────────────────────
+const MEMEX_BTN_KEY = 'memex_floating_btn'
+const MEMEX_POS_KEY = 'memex_btn_position'
+
+async function initFloatingButton() {
+  // Check if dismissed
+  const stored = await browser.storage.local.get([MEMEX_BTN_KEY, MEMEX_POS_KEY])
+  if (stored[MEMEX_BTN_KEY] === 'hidden') return
+
+  const savedPos = stored[MEMEX_POS_KEY] as { x: number; y: number } | undefined
+
+  // Create container
+  const btn = document.createElement('div')
+  btn.id = '__memex_float__'
+
+  const RIGHT  = 28
+  const BOTTOM = 80
+
+  btn.style.cssText = `
+    all: initial;
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    background: #4B6BF5 !important;
+    box-shadow: 0 4px 20px rgba(75,107,245,0.45), 0 2px 8px rgba(0,0,0,0.35) !important;
+    cursor: grab !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    user-select: none !important;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s !important;
+    font-family: -apple-system, sans-serif !important;
+    ${savedPos
+      ? `left: ${savedPos.x}px !important; top: ${savedPos.y}px !important;`
+      : `right: ${RIGHT}px !important; bottom: ${BOTTOM}px !important;`
+    }
+  `
+
+  // M logo SVG
+  btn.innerHTML = `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+         style="pointer-events:none;display:block">
+      <rect width="24" height="24" rx="6" fill="#4B6BF5"/>
+      <text x="4" y="19" font-family="-apple-system,sans-serif"
+            font-weight="700" font-size="17" fill="white">M</text>
+    </svg>
+  `
+
+  // Tooltip
+  const tooltip = document.createElement('div')
+  tooltip.style.cssText = `
+    all: initial;
+    position: absolute !important;
+    right: 52px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: #181e30 !important;
+    color: #f0f0f0 !important;
+    font-family: -apple-system, sans-serif !important;
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.15s !important;
+    border: 1px solid #313c5e !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+  `
+  tooltip.textContent = 'Save to Memex'
+  btn.appendChild(tooltip)
+
+  // Dismiss × button
+  const dismiss = document.createElement('div')
+  dismiss.style.cssText = `
+    all: initial;
+    position: absolute !important;
+    top: -7px !important;
+    right: -7px !important;
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: #313c5e !important;
+    color: #b8b8c8 !important;
+    font-family: -apple-system, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    opacity: 0 !important;
+    transition: opacity 0.15s, background 0.15s !important;
+    border: 1.5px solid #3f4d74 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    line-height: 1 !important;
+  `
+  dismiss.textContent = '×'
+  dismiss.title = 'Hide button'
+  btn.appendChild(dismiss)
+
+  document.documentElement.appendChild(btn)
+
+  // ── Hover ──
+  let isDragging = false
+
+  btn.addEventListener('mouseenter', () => {
+    if (isDragging) return
+    btn.style.transform   = 'scale(1.1)'
+    btn.style.boxShadow   = '0 6px 28px rgba(75,107,245,0.6), 0 2px 8px rgba(0,0,0,0.4)'
+    tooltip.style.opacity = '1'
+    dismiss.style.opacity = '1'
+  })
+
+  btn.addEventListener('mouseleave', () => {
+    if (isDragging) return
+    btn.style.transform   = 'scale(1)'
+    btn.style.boxShadow   = '0 4px 20px rgba(75,107,245,0.45), 0 2px 8px rgba(0,0,0,0.35)'
+    tooltip.style.opacity = '0'
+    dismiss.style.opacity = '0'
+  })
+
+  dismiss.addEventListener('mouseenter', (e) => {
+    e.stopPropagation()
+    dismiss.style.background = '#4B6BF5'
+    dismiss.style.color      = '#ffffff'
+  })
+  dismiss.addEventListener('mouseleave', (e) => {
+    e.stopPropagation()
+    dismiss.style.background = '#313c5e'
+    dismiss.style.color      = '#b8b8c8'
+  })
+
+  // ── Dismiss ──
+  dismiss.addEventListener('click', async (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    btn.style.transform = 'scale(0)'
+    btn.style.opacity   = '0'
+    await browser.storage.local.set({ [MEMEX_BTN_KEY]: 'hidden' })
+    setTimeout(() => btn.remove(), 250)
+  })
+
+  // ── Drag ──
+  let startMouseX = 0
+  let startMouseY = 0
+  let startBtnX   = 0
+  let startBtnY   = 0
+  let hasMoved    = false
+
+  btn.addEventListener('mousedown', (e) => {
+    if ((e.target as HTMLElement) === dismiss) return
+    if (e.button !== 0) return
+
+    isDragging  = true
+    hasMoved    = false
+    startMouseX = e.clientX
+    startMouseY = e.clientY
+
+    const rect  = btn.getBoundingClientRect()
+    startBtnX   = rect.left
+    startBtnY   = rect.top
+
+    // Switch from right/bottom to left/top positioning
+    btn.style.right      = 'auto'
+    btn.style.bottom     = 'auto'
+    btn.style.left       = startBtnX + 'px'
+    btn.style.top        = startBtnY + 'px'
+    btn.style.cursor     = 'grabbing'
+    btn.style.transition = 'none'
+
+    e.preventDefault()
+    e.stopPropagation()
+  })
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return
+
+    const dx = e.clientX - startMouseX
+    const dy = e.clientY - startMouseY
+
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) hasMoved = true
+
+    const newX = Math.max(8, Math.min(window.innerWidth  - 52, startBtnX + dx))
+    const newY = Math.max(8, Math.min(window.innerHeight - 52, startBtnY + dy))
+
+    btn.style.left = newX + 'px'
+    btn.style.top  = newY + 'px'
+  }
+
+  const onMouseUp = async (e: MouseEvent) => {
+    if (!isDragging) return
+    isDragging = false
+
+    btn.style.cursor     = 'grab'
+    btn.style.transition = 'transform 0.15s, box-shadow 0.15s, opacity 0.2s'
+
+    // Save new position
+    const rect = btn.getBoundingClientRect()
+    await browser.storage.local.set({
+      [MEMEX_POS_KEY]: { x: rect.left, y: rect.top }
+    })
+
+    // If didn't move much → treat as click
+    if (!hasMoved) {
+      browser.runtime.sendMessage({ type: 'MEMEX_OPEN_POPUP' }).catch(() => {})
+    }
+  }
+
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup',   onMouseUp)
+}
+
+// Run floating button after page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFloatingButton)
+} else {
+  initFloatingButton()
+}

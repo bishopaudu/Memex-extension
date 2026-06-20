@@ -28,7 +28,7 @@ const EXTRACT_TYPES = [
     emoji:       '📝',
     label:       'Article text',
     description: 'Main readable content stripped of ads and navigation',
-    color:       '#4f6ef7',
+    color:       '#4B6BF5',
   },
   {
     key:         'images' as const,
@@ -123,18 +123,18 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
   }
 
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl overflow-hidden">
+    <div className="bg-[#1f2640] border border-[#313c5e] rounded-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5
-                      border-b border-[#1e1e1e]">
+                      border-b border-[#313c5e]">
         <div className="flex items-center gap-2">
           <span className="text-sm">📰</span>
-          <span className="text-[11px] font-medium text-[#ccc]">
+          <span className="text-[11px] font-medium text-[#f0f0f0]">
             Extract from page
           </span>
         </div>
         <button onClick={onClose}
-                className="text-[#888888] hover:text-[#999] transition-colors text-sm">
+                className="text-[#8888a0] hover:text-[#b8b8c8] transition-colors text-sm">
           ×
         </button>
       </div>
@@ -157,9 +157,9 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
                   ? ext.color + '12'
                   : isExtracting
                     ? ext.color + '18'
-                    : '#161616',
+                    : '#272f4d',
                 border: `0.5px solid ${
-                  isDone || isExtracting ? ext.color + '40' : '#1e1e1e'
+                  isDone || isExtracting ? ext.color + '40' : '#313c5e'
                 }`,
                 opacity: extracting && !isExtracting ? 0.4 : 1,
               }}
@@ -187,10 +187,10 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
               {/* Text */}
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-medium truncate"
-                   style={{ color: isDone ? ext.color : '#ccc' }}>
+                   style={{ color: isDone ? ext.color : '#f0f0f0' }}>
                   {isDone ? `${ext.label} extracted ✓` : ext.label}
                 </p>
-                <p className="text-[9px] truncate" style={{ color: '#444' }}>
+                <p className="text-[9px] truncate" style={{ color: '#aaaaaa' }}>
                   {isExtracting ? 'Extracting...' : ext.description}
                 </p>
               </div>
@@ -219,7 +219,7 @@ export function ExtractPanel({ onAdd, onClose }: Props) {
 
       {/* Done summary */}
       {done.length > 0 && (
-        <div className="mx-2 mb-2 px-3 py-2 bg-[#161616] border border-[#1e1e1e]
+        <div className="mx-2 mb-2 px-3 py-2 bg-[#272f4d] border border-[#313c5e]
                         rounded-lg">
           <p className="text-[10px] text-[#999999]">
             {done.length} extraction{done.length > 1 ? 's' : ''} added to attachments

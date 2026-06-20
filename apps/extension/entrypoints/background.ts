@@ -1,4 +1,24 @@
 export default defineBackground(() => {
+  // Handle floating button click
+  browser.runtime.onMessage.addListener((msg: any) => {
+    if (msg.type === 'MEMEX_OPEN_POPUP') {
+      // Try to open popup programmatically
+      // Falls back gracefully if not supported
+      try {
+        (browser.action as any)?.openPopup?.()
+      } catch {}
+    }
+  })
+
+  // Handle floating button click → open popup
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'OPEN_POPUP') {
+      chrome.action.openPopup?.().catch(() => {
+        // openPopup not available in all browsers — fallback is fine
+      })
+    }
+  })
+
 
   // Create the right-click context menu item
   browser.runtime.onInstalled.addListener(() => {

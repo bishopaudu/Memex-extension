@@ -30,13 +30,13 @@ export function TagInput({ tags, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1 p-2 bg-[#161616] border border-[#252525]
+    <div className="flex flex-wrap gap-1 p-2 bg-[#272f4d] border border-[#3f4d74]
                     rounded-lg min-h-[38px] focus-within:border-[#4f6ef7]
                     transition-colors">
       {tags.map(tag => (
         <span key={tag}
-              className="flex items-center gap-1 px-2 py-0.5 bg-[#1a1f3a]
-                         text-[#7b93ff] text-[10px] rounded">
+              className="flex items-center gap-1 px-2 py-0.5 bg-[#1a2550]
+                         text-[#93a8fa] text-[10px] rounded">
           {tag}
           <button onClick={() => removeTag(tag)}
                   className="hover:text-white transition-colors leading-none">×</button>
@@ -50,7 +50,7 @@ export function TagInput({ tags, onChange }: Props) {
         onBlur={() => addTag(input)}
         placeholder={tags.length === 0 ? 'Add tags...' : ''}
         className="flex-1 min-w-[80px] text-xs bg-transparent outline-none
-                   text-[#e2e2e2] placeholder-[#444]"
+                   text-[#f0f0f0] placeholder-[#777777]"
       />
     </div>
   )

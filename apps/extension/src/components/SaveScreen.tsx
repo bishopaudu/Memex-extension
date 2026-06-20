@@ -33,6 +33,20 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const [title,         setTitle]         = useState('')
   const [tags,          setTags]          = useState<string[]>([])
   const [saveState,     setSaveState]     = useState<SaveState>('idle')
+  const [btnVisible,    setBtnVisible]    = useState(true)
+
+  // Check floating button state on mount
+  useEffect(() => {
+    chrome.storage.local.get('memex_floating_btn').then(r => {
+      setBtnVisible(r.memex_floating_btn !== 'hidden')
+    })
+  }, [])
+
+  async function toggleFloatingButton() {
+    const newState = btnVisible ? 'hidden' : 'visible'
+    await chrome.storage.local.set({ memex_floating_btn: newState })
+    setBtnVisible(!btnVisible)
+  }
   const [errorMsg,      setErrorMsg]      = useState('')
   const [attachments,   setAttachments]   = useState<Attachment[]>([])
   const [addingText,    setAddingText]    = useState(false)
@@ -255,7 +269,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
   if (!pageInfo) {
     return (
-      <div className="flex flex-col min-h-[480px] bg-[#0a0a0a]">
+      <div className="flex flex-col min-h-[480px] bg-[#12172a]">
         <TopBar onLogout={onLogout} />
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-[#4f6ef7] border-t-transparent
@@ -271,7 +285,37 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     const done      = attachments.filter(a => a.status === 'done').length
 
     return (
-      <div className="flex flex-col bg-[#0a0a0a]" style={{ minHeight: 480 }}>
+      <div className="flex flex-col bg-[#12172a]" style={{ minHeight: 480 }}>
+        {/* Profile bar */}
+        <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[#313c5e]
+                        bg-[#181e30]">
+          <div className="w-7 h-7 rounded-full bg-[#4B6BF5] flex items-center
+                          justify-center text-white font-bold text-[11px] flex-shrink-0">
+            {userEmail?.[0]?.toUpperCase() ?? 'M'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-[#f0f0f0] font-medium truncate">
+              {userEmail}
+            </p>
+            <p className="text-[9px] text-[#606080]">Memex</p>
+          </div>
+          <button
+            onClick={toggleFloatingButton}
+            className="text-[10px] text-[#606080] hover:text-[#93a8fa]
+                       transition-colors px-2 py-1 rounded flex-shrink-0"
+            title={btnVisible ? 'Hide floating button' : 'Show floating button'}
+          >
+            {btnVisible ? '📌' : '📍'}
+          </button>
+
+          <button
+            onClick={onLogout}
+            className="text-[10px] text-[#606080] hover:text-[#8888a0]
+                       transition-colors px-2 py-1 rounded flex-shrink-0"
+          >
+            Sign out
+          </button>
+        </div>
         <TopBar onLogout={onLogout} />
         <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4">
 
@@ -290,7 +334,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           </div>
 
           <div className="text-center">
-            <p className="text-sm font-semibold text-[#e2e2e2] mb-1">Saved to Memex</p>
+            <p className="text-sm font-semibold text-[#f0f0f0] mb-1">Saved to Memex</p>
             <p className="text-[11px] text-[#aaaaaa]">
               {attachments.length > 0
                 ? uploading > 0
@@ -305,16 +349,16 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             <div className="w-full flex flex-col gap-1.5">
               {attachments.map(att => (
                 <div key={att.id}
-                     className="flex items-center gap-2.5 px-3 py-2 bg-[#111]
-                                border border-[#1e1e1e] rounded-lg">
+                     className="flex items-center gap-2.5 px-3 py-2 bg-[#1f2640]
+                                border border-[#313c5e] rounded-lg">
                   {att.type !== 'text' && att.preview ? (
                     <img src={att.preview} alt=""
-                         className="w-7 h-7 object-cover rounded border border-[#252525]" />
+                         className="w-7 h-7 object-cover rounded border border-[#3f4d74]" />
                   ) : (
-                    <div className="w-7 h-7 bg-[#161616] rounded flex items-center
+                    <div className="w-7 h-7 bg-[#272f4d] rounded flex items-center
                                     justify-center text-xs">📝</div>
                   )}
-                  <p className="flex-1 text-[10px] text-[#888] truncate">
+                  <p className="flex-1 text-[10px] text-[#8888a0] truncate">
                     {att.type === 'text' ? att.content?.slice(0, 30) + '...'
                       : att.type === 'area_screenshot' ? 'Area screenshot' : 'Full screenshot'}
                   </p>
@@ -342,8 +386,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           <button
             onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
             className="w-full flex items-center justify-center gap-2 py-2.5 mt-2
-                       bg-[#111] border border-[#1e1e1e] rounded-xl text-xs
-                       text-[#666] hover:border-[#4f6ef7]/30 hover:text-[#7b93ff]
+                       bg-[#1f2640] border border-[#313c5e] rounded-xl text-xs
+                       text-[#8888a0] hover:border-[#4f6ef7]/30 hover:text-[#93a8fa]
                        transition-all"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
@@ -361,15 +405,15 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const isBusy = saveState === 'saving'
 
   return (
-    <div className="flex flex-col bg-[#0a0a0a]" style={{ minHeight: 480 }}>
+    <div className="flex flex-col bg-[#12172a]" style={{ minHeight: 480 }}>
       <TopBar onLogout={onLogout} />
 
       {/* Page info card */}
       <div className="mx-3 mt-3 mb-0">
-        <div className="flex items-center gap-2.5 px-3 py-2.5 bg-[#111]
-                        border border-[#1e1e1e] rounded-xl">
+        <div className="flex items-center gap-2.5 px-3 py-2.5 bg-[#1f2640]
+                        border border-[#313c5e] rounded-xl">
           {pageInfo.faviconUrl ? (
-            <div className="w-8 h-8 bg-[#1a1a1a] rounded-lg border border-[#252525]
+            <div className="w-8 h-8 bg-[#272f4d] rounded-lg border border-[#3f4d74]
                             flex items-center justify-center flex-shrink-0 overflow-hidden">
               <img
                 src={pageInfo.faviconUrl}
@@ -381,9 +425,9 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
               />
             </div>
           ) : (
-            <div className="w-8 h-8 bg-[#1a1f3a] rounded-lg border border-[#252525]
+            <div className="w-8 h-8 bg-[#1a2550] rounded-lg border border-[#3f4d74]
                             flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-[#7b93ff]" fill="none" viewBox="0 0 24 24"
+              <svg className="w-4 h-4 text-[#93a8fa]" fill="none" viewBox="0 0 24 24"
                    stroke="currentColor" strokeWidth={1.5}>
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="2" y1="12" x2="22" y2="12"/>
@@ -393,10 +437,10 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium text-[#ccc] truncate leading-tight">
+            <p className="text-[11px] font-medium text-[#f0f0f0] truncate leading-tight">
               {pageInfo.title || 'Untitled page'}
             </p>
-            <p className="text-[10px] text-[#888888] truncate mt-0.5">
+            <p className="text-[10px] text-[#8888a0] truncate mt-0.5">
               {new URL(pageInfo.url).hostname.replace('www.', '')}
             </p>
           </div>
@@ -407,26 +451,26 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
         {/* Title */}
         <div>
-          <label className="block text-[10px] font-medium text-[#888888] uppercase
+          <label className="block text-[10px] font-medium text-[#8888a0] uppercase
                             tracking-wider mb-1.5">Title</label>
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
             disabled={isBusy}
-            className="w-full px-3 py-2 bg-[#111] border border-[#1e1e1e]
-                       rounded-lg text-[12px] text-[#ccc] outline-none
+            className="w-full px-3 py-2 bg-[#1f2640] border border-[#313c5e]
+                       rounded-lg text-[12px] text-[#f0f0f0] outline-none
                        focus:border-[#4f6ef7]/50 transition-colors disabled:opacity-40
-                       placeholder-[#333]"
+                       placeholder-[#666666]"
           />
         </div>
 
         {/* Smart tags */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[10px] font-medium text-[#888888] uppercase
+            <label className="text-[10px] font-medium text-[#8888a0] uppercase
                               tracking-wider">Tags</label>
-            <span className="text-[9px] text-[#666666]">
+            <span className="text-[9px] text-[#8888a0]">
               click to add • type to create new
             </span>
           </div>
@@ -435,11 +479,11 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
         {/* Attachments */}
         <div>
-          <label className="block text-[10px] font-medium text-[#888888] uppercase
+          <label className="block text-[10px] font-medium text-[#8888a0] uppercase
                             tracking-wider mb-1.5">
             Attachments
             {attachments.length > 0 && (
-              <span className="ml-1.5 text-[#4f6ef7] normal-case font-normal">
+              <span className="ml-1.5 text-[#4B6BF5] normal-case font-normal">
                 ({attachments.length})
               </span>
             )}
@@ -448,22 +492,22 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           {/* Area preview */}
           {areaPreview && (
             <div className="mb-2 rounded-xl overflow-hidden border border-[#4f6ef7]/30
-                            bg-[#111]">
+                            bg-[#1f2640]">
               <img src={areaPreview.dataUrl} alt="Selected area"
                    className="w-full object-contain max-h-28" />
-              <div className="flex items-center gap-2 px-3 py-2 border-t border-[#1e1e1e]">
-                <span className="text-[10px] text-[#555] flex-1">Area selected</span>
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-[#313c5e]">
+                <span className="text-[10px] text-[#bbbbbb] flex-1">Area selected</span>
                 <button onClick={() => setAreaPreview(null)}
-                        className="text-[10px] text-[#aaaaaa] hover:text-[#888] px-2 py-1">
+                        className="text-[10px] text-[#aaaaaa] hover:text-[#8888a0] px-2 py-1">
                   Discard
                 </button>
                 <button onClick={retryAreaSelect}
-                        className="text-[10px] text-[#555] hover:text-[#999]
-                                   border border-[#252525] px-2 py-1 rounded">
+                        className="text-[10px] text-[#bbbbbb] hover:text-[#b8b8c8]
+                                   border border-[#3f4d74] px-2 py-1 rounded">
                   Retry
                 </button>
                 <button onClick={confirmAreaScreenshot}
-                        className="text-[10px] text-white bg-[#4f6ef7] hover:bg-[#3b5bf5]
+                        className="text-[10px] text-white bg-[#4B6BF5] hover:bg-[#3b5bf5]
                                    px-3 py-1 rounded font-medium transition-colors">
                   Add ✓
                 </button>
@@ -476,25 +520,25 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
             <div className="flex flex-col gap-1.5 mb-2">
               {attachments.map(att => (
                 <div key={att.id}
-                     className="flex items-center gap-2 p-2 bg-[#111]
-                                border border-[#1e1e1e] rounded-lg group">
+                     className="flex items-center gap-2 p-2 bg-[#1f2640]
+                                border border-[#313c5e] rounded-lg group">
                   {att.type !== 'text' && att.preview ? (
                     <img src={att.preview} alt=""
                          className="w-9 h-9 object-cover rounded border
-                                    border-[#252525] flex-shrink-0" />
+                                    border-[#3f4d74] flex-shrink-0" />
                   ) : (
-                    <div className="w-9 h-9 bg-[#161616] rounded flex items-center
+                    <div className="w-9 h-9 bg-[#272f4d] rounded flex items-center
                                     justify-center text-sm flex-shrink-0">📝</div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-[#888] truncate">
+                    <p className="text-[10px] text-[#8888a0] truncate">
                       {att.type === 'text' ? att.content?.slice(0, 35)
                         : att.type === 'area_screenshot' ? 'Area screenshot' : 'Full screenshot'}
                     </p>
                   </div>
                   <button
                     onClick={() => removeAttachment(att.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[#888888]
+                    className="opacity-0 group-hover:opacity-100 text-[#8888a0]
                                hover:text-red-400 p-1 transition-all"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
@@ -521,18 +565,18 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
                 }}
                 placeholder="Type a note, quote, or thought..."
                 rows={3}
-                className="w-full px-3 py-2 bg-[#111] border border-[#4f6ef7]/40
-                           rounded-lg text-[11px] text-[#ccc] placeholder-[#333]
+                className="w-full px-3 py-2 bg-[#1f2640] border border-[#4f6ef7]/40
+                           rounded-lg text-[11px] text-[#f0f0f0] placeholder-[#666666]
                            outline-none resize-none"
               />
               <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="text-[9px] text-[#666666] flex-1">⌘↵ to add</span>
+                <span className="text-[9px] text-[#8888a0] flex-1">⌘↵ to add</span>
                 <button onClick={() => { setAddingText(false); setTextInput('') }}
-                        className="text-[10px] text-[#aaaaaa] hover:text-[#888] px-2 py-1">
+                        className="text-[10px] text-[#aaaaaa] hover:text-[#8888a0] px-2 py-1">
                   Cancel
                 </button>
                 <button onClick={addTextNote} disabled={!textInput.trim()}
-                        className="text-[10px] text-white bg-[#4f6ef7] hover:bg-[#3b5bf5]
+                        className="text-[10px] text-white bg-[#4B6BF5] hover:bg-[#3b5bf5]
                                    disabled:opacity-30 px-3 py-1 rounded font-medium
                                    transition-colors">
                   Add note
@@ -590,7 +634,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         <button
           onClick={handleSave}
           disabled={isBusy || !!areaPreview}
-          className="w-full py-2.5 bg-[#4f6ef7] hover:bg-[#3b5bf5] disabled:opacity-40
+          className="w-full py-2.5 bg-[#4B6BF5] hover:bg-[#3b5bf5] disabled:opacity-40
                      text-white text-[13px] font-medium rounded-xl transition-colors
                      flex items-center justify-center gap-2"
         >
@@ -618,7 +662,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           )}
         </button>
         {!areaPreview && (
-          <p className="text-center text-[9px] text-[#555555] mt-1.5">
+          <p className="text-center text-[9px] text-[#bbbbbb] mt-1.5">
             📸 Screenshot auto-captured on save
           </p>
         )}
@@ -642,11 +686,11 @@ function AttachBtn({ emoji, label, onClick, disabled, hint }: {
       disabled={disabled}
       title={hint}
       className="flex flex-col items-center gap-1.5 py-3 rounded-xl border
-                 bg-[#111] border-[#1a1a1a] hover:border-[#444444]
+                 bg-[#1f2640] border-[#272f4d] hover:border-[#444444]
                  hover:bg-[#141414] transition-all disabled:opacity-40"
     >
       <span className="text-lg leading-none">{emoji}</span>
-      <span className="text-[9px] text-[#3a3a3a] font-medium">{label}</span>
+      <span className="text-[9px] text-[#999999] font-medium">{label}</span>
     </button>
   )
 }
@@ -656,17 +700,17 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
     <div className="flex items-center justify-between px-3 py-2.5
                     border-b border-[#111]">
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 bg-[#4f6ef7] rounded-lg flex items-center
+        <div className="w-6 h-6 bg-[#4B6BF5] rounded-lg flex items-center
                         justify-center text-white font-bold text-[11px]">M</div>
-        <span className="text-[13px] font-semibold text-[#ccc]
+        <span className="text-[13px] font-semibold text-[#f0f0f0]
                          tracking-tight">Memex</span>
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
           className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] text-[#aaaaaa]
-                     bg-[#111] border border-[#1a1a1a] rounded-lg
-                     hover:text-[#7b93ff] hover:border-[#4f6ef7]/30
+                     bg-[#1f2640] border border-[#272f4d] rounded-lg
+                     hover:text-[#93a8fa] hover:border-[#4f6ef7]/30
                      transition-all"
         >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
@@ -681,7 +725,7 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
         <button
           onClick={onLogout}
           className="w-7 h-7 flex items-center justify-center rounded-lg
-                     text-[#666666] hover:text-[#666] hover:bg-[#111]
+                     text-[#8888a0] hover:text-[#8888a0] hover:bg-[#1f2640]
                      transition-colors"
           title="Sign out"
         >
