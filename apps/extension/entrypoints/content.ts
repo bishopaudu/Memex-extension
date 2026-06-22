@@ -591,3 +591,21 @@ if (document.readyState === 'loading') {
 } else {
   initFloatingButton()
 }
+
+// Listen for storage changes — re-show button if user toggles it back on
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return
+  if (!changes.memex_floating_btn) return
+
+  const newValue = changes.memex_floating_btn.newValue
+
+  if (newValue === 'hidden') {
+    // Remove button if it exists
+    document.getElementById('__memex_float__')?.remove()
+  } else {
+    // Re-create button if it doesn't exist
+    if (!document.getElementById('__memex_float__')) {
+      initFloatingButton()
+    }
+  }
+})

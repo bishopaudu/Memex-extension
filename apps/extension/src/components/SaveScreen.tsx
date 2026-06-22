@@ -406,7 +406,43 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
   return (
     <div className="flex flex-col bg-[#12172a]" style={{ minHeight: 480 }}>
-      <TopBar onLogout={onLogout} />
+
+      {/* ── Profile bar ── */}
+      <div className="flex items-center gap-2.5 px-3 py-2 border-b border-[#313c5e]
+                      bg-[#181e30]">
+        {/* Avatar */}
+        <div className="w-7 h-7 rounded-full bg-[#4B6BF5] flex items-center
+                        justify-center text-white font-bold text-[11px] flex-shrink-0">
+          {userEmail?.[0]?.toUpperCase() ?? 'M'}
+        </div>
+
+        {/* Email */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] text-[#f0f0f0] font-medium truncate leading-tight">
+            {userEmail}
+          </p>
+          <p className="text-[9px] text-[#606080] leading-tight">Memex account</p>
+        </div>
+
+        {/* Floating button toggle */}
+        <button
+          onClick={toggleFloatingButton}
+          className="text-[11px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
+                     text-[#606080] hover:text-[#93a8fa] hover:bg-[#1f2640]"
+          title={btnVisible ? 'Hide page button' : 'Show page button'}
+        >
+          {btnVisible ? '📌' : '📍'}
+        </button>
+
+        {/* Sign out */}
+        <button
+          onClick={onLogout}
+          className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
+                     text-[#606080] hover:text-[#f87171] hover:bg-[#2a0d0d]"
+        >
+          Sign out
+        </button>
+      </div>
 
       {/* Page info card */}
       <div className="mx-3 mt-3 mb-0">
