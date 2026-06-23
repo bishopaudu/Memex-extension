@@ -35,12 +35,11 @@ interface PathResult {
 }
 
 interface Props {
-  theme:       'dark' | 'light'
   onOpenTopic: (id: string) => void
   onClose:     () => void
 }
 
-export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
+export function TopicGraph({ onOpenTopic, onClose }: Props) {
   const svgRef         = useRef<SVGSVGElement>(null)
   const zoomRef        = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const simulationRef  = useRef<d3.Simulation<GraphNode, GraphEdge> | null>(null)
@@ -121,7 +120,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
     if (!svgRef.current || nodeCount === 0) return
     const nodes = nodesRef.current
     if (nodes.length === 0) return
-    const dark = theme === 'dark'
+    const dark = true
 
     if (heatmap === 'none') {
       d3.select(svgRef.current)
@@ -155,9 +154,8 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
       .transition().duration(500)
       .attr('fill', d => heatColor(getValue(d)) + (dark ? '35' : '25'))
       .attr('stroke', d => heatColor(getValue(d)))
-  }, [heatmap, nodeCount, theme])
+  }, [heatmap, nodeCount])
 
-  useEffect(() => { loadAndDraw() }, [theme])
 
   async function loadAndDraw() {
     setLoading(true)
@@ -1049,12 +1047,12 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
         {heatmap !== 'none' && !loading && nodeCount > 0 && (
           <div className="absolute top-4 right-4 px-3 py-2.5 rounded-xl text-[10px]"
                style={{
-                 background:     (theme === 'dark' ? '#111' : '#fff') + 'ee',
-                 border:         `0.5px solid ${theme === 'dark' ? '#1e1e1e' : '#e5e5e5'}`,
+                 background:     ('#12172a') + 'ee',
+                 border:         `0.5px solid ${'#313c5e'}`,
                  backdropFilter: 'blur(8px)',
                }}>
             <p className="font-medium mb-2"
-               style={{ color: theme === 'dark' ? '#555' : '#999' }}>
+               style={{ color: '#8888a0' }}>
               Heat map — {heatmap === 'refs' ? 'by references' : 'by connections'}
             </p>
             <div className="flex flex-col gap-1.5">
@@ -1068,7 +1066,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
                 <div key={item.color} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full flex-shrink-0"
                        style={{ background: item.color }} />
-                  <span style={{ color: theme === 'dark' ? '#555' : '#999' }}>
+                  <span style={{ color: '#8888a0' }}>
                     {item.label}
                   </span>
                 </div>
@@ -1077,7 +1075,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
             <button
               onClick={() => setHeatmap('none')}
               className="mt-2 text-[9px] hover:underline w-full text-center"
-              style={{ color: theme === 'dark' ? '#444' : '#aaa' }}
+              style={{ color: '#606080' }}
             >
               Reset to default colors
             </button>

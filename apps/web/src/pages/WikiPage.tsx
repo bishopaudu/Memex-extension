@@ -15,7 +15,6 @@ interface Topic {
 
 interface Props {
   topics:         Topic[]
-  theme:          'dark' | 'light'
   onOpenTopic:    (id: string) => void
   onTopicsChange: () => void
 }
@@ -30,7 +29,9 @@ const DEFAULT_EMOJIS = [
   '🌐','📊','🏗️','🎨','🚀','📚',
 ]
 
-export function WikiPage({ topics, theme, onOpenTopic, onTopicsChange }: Props) {
+export function WikiPage({ topics,
+  onOpenTopic,
+   onTopicsChange }: Props) {
   const [creating,  setCreating]  = useState(false)
   const [newTitle,  setNewTitle]  = useState('')
   const [newEmoji,  setNewEmoji]  = useState('📄')
@@ -71,7 +72,6 @@ export function WikiPage({ topics, theme, onOpenTopic, onTopicsChange }: Props) 
       {/* Graph overlay — rendered outside main layout so it's truly fullscreen */}
       {showGraph && (
         <TopicGraph
-          theme={theme}
           onOpenTopic={onOpenTopic}
           onClose={() => setShowGraph(false)}
         />

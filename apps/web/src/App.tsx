@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthContext, useAuthProvider, useAuth } from './hooks/useAuth'
 import { ToastProvider } from './components/Toast'
-import { useTheme } from './hooks/useTheme'
 import { AuthPage }      from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { PublicProfilePage } from './pages/PublicProfilePage'

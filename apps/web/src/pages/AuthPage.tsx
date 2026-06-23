@@ -1,14 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { ThemeToggle } from '../components/ThemeToggle'
 
-interface Props {
-  theme:       'dark' | 'light'
-  toggleTheme: () => void
-}
+interface Props {}
 
-export function AuthPage({ theme, toggleTheme }: Props) {
+export function AuthPage(_props: Props) {
   const [mode,     setMode]     = useState<'login' | 'signup'>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -49,7 +45,6 @@ export function AuthPage({ theme, toggleTheme }: Props) {
 
       {/* Theme toggle — top right */}
       <div className="fixed top-4 right-4">
-        <ThemeToggle theme={theme} toggle={toggleTheme} />
       </div>
 
       <div className="relative w-full max-w-sm">
