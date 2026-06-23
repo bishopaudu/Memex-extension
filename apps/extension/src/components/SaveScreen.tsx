@@ -434,13 +434,31 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           {btnVisible ? '📌' : '📍'}
         </button>
 
+        {/* Dashboard link */}
+        <button
+          onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
+          className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
+                     text-[#606080] hover:text-[#93a8fa] hover:bg-[#1f2640]
+                     flex items-center gap-1"
+          title="Open dashboard"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
+               stroke="currentColor" strokeWidth={2}>
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+          </svg>
+          Dashboard
+        </button>
+
         {/* Sign out */}
         <button
           onClick={onLogout}
           className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
                      text-[#606080] hover:text-[#f87171] hover:bg-[#2a0d0d]"
         >
-          Sign out
+          Out
         </button>
       </div>
 

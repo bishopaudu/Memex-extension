@@ -5,7 +5,6 @@ import { BookmarkCard }           from '../components/BookmarkCard'
 import { BookmarkModalLoader }    from '../components/BookmarkModalLoader'
 import { BookmarkDetailPage }     from './BookmarkDetailPage'
 import { Sidebar }                from '../components/Sidebar'
-import { ThemeToggle }            from '../components/ThemeToggle'
 import { CollectionsPage }        from './CollectionsPage'
 import { SearchModal }             from '../components/SearchModal'
 import { CollectionDetailPage }   from './CollectionDetailPage'
@@ -14,13 +13,9 @@ import { ArchivePage }             from './ArchivePage'
 import { BulkActionBar }           from '../components/BulkActionBar'
 import { ProfileModal }            from '../components/ProfileModal'
 import { ReadingListPage }         from './ReadingListPage'
-import { DailyRediscovery }        from '../components/DailyRediscovery'
 import { TopicPage }               from './TopicPage'
 
-interface Props {
-  theme:       'dark' | 'light'
-  toggleTheme: () => void
-}
+interface Props {}
 
 type Page =
   | { type: 'home' }
@@ -32,7 +27,7 @@ type Page =
   | { type: 'reading' }
   | { type: 'bookmark-detail'; bookmarkId: string }
 
-export function DashboardPage({ theme, toggleTheme }: Props) {
+export function DashboardPage(_props: Props) {
   const { auth, logout } = useAuth()
 
   const [page,             setPage]             = useState<Page>({ type: 'home' })
@@ -225,7 +220,6 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
       {page.type === 'wiki' && (
         <WikiPage
           topics={topics}
-          theme={theme}
           onOpenTopic={id => setPage({ type: 'topic', topicId: id })}
           onTopicsChange={fetchTopics}
         />
@@ -331,7 +325,6 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                   </button>
                 ))}
               </div>
-              <ThemeToggle theme={theme} toggle={toggleTheme} />
             </div>
           </header>
 
@@ -344,13 +337,6 @@ export function DashboardPage({ theme, toggleTheme }: Props) {
                   <button onClick={() => setActiveTag('')} className="hover:text-white ml-0.5">×</button>
                 </span>
               </div>
-            )}
-
-            {/* Daily rediscovery — shown once per day */}
-            {!activeTag && !debouncedSearch && (
-              <DailyRediscovery
-                onOpenBookmark={id => setPage({ type: 'bookmark-detail', bookmarkId: id })}
-              />
             )}
 
             {!loading && (

@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name:        'Memex — Visual Bookmarks',
     description: 'Save anything from the web. Find it instantly.',
-    version:     '0.0.3',
+    version:     '0.0.4',
     permissions: ['activeTab', 'storage', 'tabs', 'contextMenus'],
     host_permissions: [
       'http://localhost:3001/*',

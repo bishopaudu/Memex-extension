@@ -71,12 +71,12 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
   const pathFromRef    = useRef<string | null>(null)
   const focusedRef     = useRef<string | null>(null)
 
-  const isDark = theme === 'dark'
+    const isDark = true // single theme — always dark navy
   const C = {
     bg:        isDark ? '#0a0a0a' : '#f5f5f5',
     surface:   isDark ? '#111111' : '#ffffff',
     border:    isDark ? '#1e1e1e' : '#e5e5e5',
-    edge:      isDark ? '#2a2a2a' : '#cccccc',
+    edge:      '#3f4d74',
     text:      isDark ? '#e2e2e2' : '#111111',
     textMuted: isDark ? '#555555' : '#999999',
     orphan:    '#f59e0b',
@@ -434,7 +434,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
       .attr('y1', d => ty(d.source as GraphNode))
       .attr('x2', d => tx(d.target as GraphNode))
       .attr('y2', d => ty(d.target as GraphNode))
-      .attr('stroke', isDark ? '#2a2a2a' : '#cccccc')
+      .attr('stroke', '#3f4d74')
       .attr('stroke-width', 0.8)
       .attr('opacity', 0.6)
 
@@ -564,7 +564,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
       .data(rawEdges).enter().append('g').attr('class', 'link-group')
 
     links.append('line').attr('class', 'link-line')
-      .attr('stroke', C.edge).attr('stroke-width', 1.5).attr('stroke-opacity', 0.5)
+      .attr('stroke', C.edge).attr('stroke-width', 1.5).attr('stroke-opacity', 0.8)
       .attr('marker-end', 'url(#arrow-default)')
 
     links.append('text').attr('class', 'link-label')
@@ -682,7 +682,7 @@ export function TopicGraph({ theme, onOpenTopic, onClose }: Props) {
         d3.select(this).select('.main-circle')
           .transition().duration(150).attr('r', nodeRadius(d))
         linkGroup.selectAll('.link-line')
-          .attr('stroke', C.edge).attr('stroke-opacity', 0.5).attr('stroke-width', 1.5)
+          .attr('stroke', C.edge).attr('stroke-opacity', 0.8).attr('stroke-width', 1.5)
         setHoverCard(null)
       })
 

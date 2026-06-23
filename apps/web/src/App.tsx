@@ -34,13 +34,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const authValue  = useAuthProvider()
-  const themeValue = useTheme()
 
   return (
     <ToastProvider>
     <AuthContext.Provider value={authValue}>
       <Routes>
-        <Route path="/auth" element={<AuthPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />}/>
+        <Route path="/auth" element={<AuthPage />}/>
           <Route path="/p/:username" element={<PublicProfilePage />} />
         <Route path="/p/:username/topic/:slug"      element={<PublicTopicPage />} />
         <Route path="/p/:username/collection/:slug" element={<PublicCollectionPage />} />
@@ -55,7 +54,7 @@ export default function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <DashboardPage theme={themeValue.theme} toggleTheme={themeValue.toggle} />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
