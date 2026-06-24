@@ -42,6 +42,15 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     })
   }, [])
 
+  async function openDashboard(path = '') {
+    const result = await browser.storage.local.get('token') as { token?: string }
+    const token  = result.token
+    const url    = token
+      ? `${DASHBOARD_URL}${path}?token=${token}`
+      : `${DASHBOARD_URL}${path}`
+    browser.tabs.create({ url })
+  }
+
   async function toggleFloatingButton() {
     const newState = btnVisible ? 'hidden' : 'visible'
     await chrome.storage.local.set({ memex_floating_btn: newState })
@@ -384,7 +393,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
           )}
 
           <button
-            onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
+            onClick={() => openDashboard()}
             className="w-full flex items-center justify-center gap-2 py-2.5 mt-2
                        bg-[#1f2640] border border-[#313c5e] rounded-xl text-xs
                        text-[#8888a0] hover:border-[#4f6ef7]/30 hover:text-[#93a8fa]
@@ -436,7 +445,7 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
 
         {/* Dashboard link */}
         <button
-          onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
+          onClick={() => openDashboard()}
           className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
                      text-[#606080] hover:text-[#93a8fa] hover:bg-[#1f2640]
                      flex items-center gap-1"
@@ -761,7 +770,7 @@ function TopBar({ onLogout }: { onLogout: () => void }) {
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={() => browser.tabs.create({ url: DASHBOARD_URL })}
+          onClick={() => openDashboard()}
           className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] text-[#aaaaaa]
                      bg-[#1f2640] border border-[#272f4d] rounded-lg
                      hover:text-[#93a8fa] hover:border-[#4f6ef7]/30

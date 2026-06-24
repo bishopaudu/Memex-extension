@@ -34,6 +34,15 @@ export function useAuthProvider(): AuthContext {
   }, [])
 
   async function checkAuth() {
+    // Check if token was passed from browser extension via URL param
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken  = urlParams.get('token')
+    if (urlToken) {
+      setToken(urlToken)
+      // Clean the URL so token isn't visible/shared
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+
     const token = getToken()
 
     if (!token) {
