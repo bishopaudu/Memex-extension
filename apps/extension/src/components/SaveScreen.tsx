@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { bookmarksApi, attachmentsApi, uploadApi } from '../lib/api'
+import { bookmarksApi, attachmentsApi, uploadApi, collectionsApi } from '../lib/api'
 import { SmartTagInput }  from './SmartTagInput'
 import { ExtractPanel }  from './ExtractPanel'
 import { cropImage } from '../lib/crop'
@@ -33,14 +33,35 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   const [title,         setTitle]         = useState('')
   const [tags,          setTags]          = useState<string[]>([])
   const [saveState,     setSaveState]     = useState<SaveState>('idle')
-  const [btnVisible,    setBtnVisible]    = useState(true)
+  const [btnVisible,      setBtnVisible]      = useState(true)
+  const [showMenu,        setShowMenu]        = useState(false)
+  const [userAvatarUrl,   setUserAvatarUrl]   = useState<string | null>(null)
+  const [showCollections, setShowCollections] = useState(false)
+  const [collections,    setCollections]    = useState<{id:string;name:string;icon:string;color:string}[]>([])
+  const [selectedColl,   setSelectedColl]   = useState('')
+  const [showAttachments, setShowAttachments] = useState(false)
 
-  // Check floating button state on mount
+  // Check floating button state + load avatar on mount
   useEffect(() => {
-    chrome.storage.local.get('memex_floating_btn').then(r => {
+    fetchCollections()
+    chrome.storage.local.get(['memex_floating_btn', 'memex_user']).then(r => {
       setBtnVisible(r.memex_floating_btn !== 'hidden')
+      if (r.memex_user) {
+        try {
+          const u = JSON.parse(r.memex_user)
+          if (u?.avatarUrl) setUserAvatarUrl(u.avatarUrl)
+        } catch {}
+      }
     })
   }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showMenu) return
+    const handler = () => setShowMenu(false)
+    setTimeout(() => document.addEventListener('click', handler), 0)
+    return () => document.removeEventListener('click', handler)
+  }, [showMenu])
 
   async function openDashboard(path = '') {
     const result = await browser.storage.local.get('token') as { token?: string }
@@ -49,6 +70,13 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
       ? `${DASHBOARD_URL}${path}?token=${token}`
       : `${DASHBOARD_URL}${path}`
     browser.tabs.create({ url })
+  }
+
+  async function fetchCollections() {
+    try {
+      const r = await collectionsApi.list()
+      if (!r.error) setCollections(r.data.items)
+    } catch {}
   }
 
   async function toggleFloatingButton() {
@@ -229,6 +257,13 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
     // ── Step 4: Upload manual attachments (notes, area crops)
     // Also BEFORE setSaveState so popup stays alive during uploads
     await uploadAttachments(bookmarkId)
+
+    // ── Step 5b: Add to collection if selected
+    if (selectedColl && bookmarkId) {
+      try {
+        await collectionsApi.addBookmark(selectedColl, bookmarkId)
+      } catch {}
+    }
 
     // ── Step 5: NOW show saved state — all uploads complete
     setSaveState('saved')
@@ -416,59 +451,134 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
   return (
     <div className="flex flex-col bg-[#12172a]" style={{ minHeight: 480 }}>
 
-      {/* ── Profile bar ── */}
-      <div className="flex items-center gap-2.5 px-3 py-2 border-b border-[#313c5e]
-                      bg-[#181e30]">
-        {/* Avatar */}
-        <div className="w-7 h-7 rounded-full bg-[#4B6BF5] flex items-center
-                        justify-center text-white font-bold text-[11px] flex-shrink-0">
-          {userEmail?.[0]?.toUpperCase() ?? 'M'}
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between px-3 py-2.5
+                      border-b border-[#313c5e] bg-[#181e30]">
+        {/* Logo + name */}
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#4B6BF5] flex items-center
+                          justify-center text-white font-bold text-[11px]">
+            M
+          </div>
+          <span className="text-[12px] font-semibold text-[#f0f0f0]">Memex</span>
         </div>
 
-        {/* Email */}
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-[#f0f0f0] font-medium truncate leading-tight">
-            {userEmail}
-          </p>
-          <p className="text-[9px] text-[#606080] leading-tight">Memex account</p>
+        {/* Right — avatar with dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(prev => !prev)}
+            className="flex items-center justify-center w-7 h-7 rounded-full
+                       overflow-hidden border-2 border-transparent
+                       hover:border-[#4B6BF5] transition-all"
+            title={userEmail}
+          >
+            {userAvatarUrl ? (
+              <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-[#4B6BF5] flex items-center
+                              justify-center text-white font-bold text-[11px]">
+                {userEmail?.[0]?.toUpperCase() ?? 'M'}
+              </div>
+            )}
+          </button>
+
+          {/* Dropdown menu */}
+          {showMenu && (
+            <div className="absolute right-0 top-9 w-44 bg-[#1f2640] border
+                            border-[#313c5e] rounded-xl shadow-2xl overflow-hidden z-50">
+              {/* User info */}
+              <div className="px-3 py-2.5 border-b border-[#313c5e]">
+                <p className="text-[11px] font-medium text-[#f0f0f0] truncate">
+                  {userEmail}
+                </p>
+              </div>
+
+              {/* Menu items */}
+              <div className="py-1">
+                <button
+                  onClick={() => { openDashboard(); setShowMenu(false) }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px]
+                             text-[#b8b8c8] hover:text-[#f0f0f0] hover:bg-[#272f4d]
+                             transition-colors text-left"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#4B6BF5]" fill="none"
+                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                  </svg>
+                  Dashboard
+                </button>
+
+                <button
+                  onClick={() => {
+                    browser.tabs.create({ url: `${DASHBOARD_URL}/help` })
+                    setShowMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px]
+                             text-[#b8b8c8] hover:text-[#f0f0f0] hover:bg-[#272f4d]
+                             transition-colors text-left"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#93a8fa]" fill="none"
+                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Help
+                </button>
+
+                <button
+                  onClick={() => {
+                    browser.tabs.create({ url: `${DASHBOARD_URL}/feedback` })
+                    setShowMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px]
+                             text-[#b8b8c8] hover:text-[#f0f0f0] hover:bg-[#272f4d]
+                             transition-colors text-left"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#93a8fa]" fill="none"
+                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                  Feedback
+                </button>
+
+                <button
+                  onClick={() => {
+                    toggleFloatingButton()
+                    setShowMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px]
+                             text-[#b8b8c8] hover:text-[#f0f0f0] hover:bg-[#272f4d]
+                             transition-colors text-left"
+                >
+                  <span className="text-[13px]">{btnVisible ? '📌' : '📍'}</span>
+                  {btnVisible ? 'Hide page button' : 'Show page button'}
+                </button>
+              </div>
+
+              {/* Sign out */}
+              <div className="border-t border-[#313c5e] py-1">
+                <button
+                  onClick={() => { onLogout(); setShowMenu(false) }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px]
+                             text-[#f87171] hover:bg-[#2a0d0d]
+                             transition-colors text-left"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                       stroke="currentColor" strokeWidth={2}>
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Floating button toggle */}
-        <button
-          onClick={toggleFloatingButton}
-          className="text-[11px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
-                     text-[#606080] hover:text-[#93a8fa] hover:bg-[#1f2640]"
-          title={btnVisible ? 'Hide page button' : 'Show page button'}
-        >
-          {btnVisible ? '📌' : '📍'}
-        </button>
-
-        {/* Dashboard link */}
-        <button
-          onClick={() => openDashboard()}
-          className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
-                     text-[#606080] hover:text-[#93a8fa] hover:bg-[#1f2640]
-                     flex items-center gap-1"
-          title="Open dashboard"
-        >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24"
-               stroke="currentColor" strokeWidth={2}>
-            <rect x="3" y="3" width="7" height="7"/>
-            <rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/>
-            <rect x="14" y="14" width="7" height="7"/>
-          </svg>
-          Dashboard
-        </button>
-
-        {/* Sign out */}
-        <button
-          onClick={onLogout}
-          className="text-[10px] px-2 py-1 rounded-lg transition-colors flex-shrink-0
-                     text-[#606080] hover:text-[#f87171] hover:bg-[#2a0d0d]"
-        >
-          Out
-        </button>
       </div>
 
       {/* Page info card */}
@@ -510,47 +620,131 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col gap-3 px-3 py-3 overflow-y-auto">
+      <div className="flex-1 flex flex-col gap-0 px-3 py-3 overflow-y-auto">
 
         {/* Title */}
-        <div>
-          <label className="block text-[10px] font-medium text-[#8888a0] uppercase
-                            tracking-wider mb-1.5">Title</label>
+        <div className="mb-3">
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
             disabled={isBusy}
-            className="w-full px-3 py-2 bg-[#1f2640] border border-[#313c5e]
-                       rounded-lg text-[12px] text-[#f0f0f0] outline-none
-                       focus:border-[#4f6ef7]/50 transition-colors disabled:opacity-40
-                       placeholder-[#666666]"
+            placeholder="Title"
+            className="w-full px-3 py-2.5 bg-[#1f2640] border border-[#313c5e]
+                       rounded-xl text-[13px] text-[#f0f0f0] outline-none font-medium
+                       focus:border-[#4B6BF5] transition-colors disabled:opacity-40
+                       placeholder-[#606080]"
           />
         </div>
 
-        {/* Smart tags */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[10px] font-medium text-[#8888a0] uppercase
-                              tracking-wider">Tags</label>
-            <span className="text-[9px] text-[#8888a0]">
-              click to add • type to create new
-            </span>
-          </div>
+        {/* Tags */}
+        <div className="mb-3">
           <SmartTagInput tags={tags} onChange={setTags} />
         </div>
 
-        {/* Attachments */}
-        <div>
-          <label className="block text-[10px] font-medium text-[#8888a0] uppercase
-                            tracking-wider mb-1.5">
-            Attachments
-            {attachments.length > 0 && (
-              <span className="ml-1.5 text-[#4B6BF5] normal-case font-normal">
-                ({attachments.length})
+        {/* Divider */}
+        <div className="border-t border-[#1f2640] mb-1" />
+
+        {/* Collections — collapsible */}
+        <div className="mb-1">
+          <button
+            onClick={() => setShowCollections(prev => !prev)}
+            className="w-full flex items-center justify-between py-2 text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-[#606080]" fill="none"
+                   viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+              </svg>
+              <span className="text-[12px] text-[#8888a0] group-hover:text-[#b8b8c8]
+                               transition-colors">
+                Collection
+                {selectedColl && (
+                  <span className="ml-1.5 text-[#93a8fa] text-[11px]">
+                    {collections.find(c => c.id === selectedColl)?.name ?? ''}
+                  </span>
+                )}
               </span>
-            )}
-          </label>
+            </div>
+            <svg className={`w-3 h-3 text-[#606080] transition-transform
+                            ${showCollections ? 'rotate-180' : ''}`}
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          {showCollections && (
+            <div className="pb-2">
+              {collections.length === 0 ? (
+                <p className="text-[11px] text-[#606080] px-1 py-1">
+                  No collections yet
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    onClick={() => setSelectedColl('')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] border transition-all
+                                ${!selectedColl
+                                  ? 'bg-[#1a2550] border-[#4B6BF5]/40 text-[#93a8fa]'
+                                  : 'bg-[#1f2640] border-[#313c5e] text-[#606080] hover:border-[#3f4d74]'}`}
+                  >
+                    None
+                  </button>
+                  {collections.map(col => (
+                    <button
+                      key={col.id}
+                      onClick={() => setSelectedColl(
+                        prev => prev === col.id ? '' : col.id
+                      )}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg
+                                  text-[11px] border transition-all
+                                  ${selectedColl === col.id
+                                    ? 'border-[#4B6BF5]/40 text-[#93a8fa]'
+                                    : 'bg-[#1f2640] border-[#313c5e] text-[#606080] hover:border-[#3f4d74] hover:text-[#8888a0]'}`}
+                      style={selectedColl === col.id
+                        ? { background: col.color + '18', borderColor: col.color + '50', color: col.color }
+                        : {}}
+                    >
+                      <span>{col.icon}</span>
+                      <span className="truncate max-w-[80px]">{col.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Attachments — collapsible */}
+        <div className="mb-1">
+          <button
+            onClick={() => setShowAttachments(prev => !prev)}
+            className="w-full flex items-center justify-between py-2 text-left
+                       group"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-[#606080]" fill="none"
+                   viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19
+                         a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span className="text-[12px] text-[#8888a0] group-hover:text-[#b8b8c8]
+                               transition-colors">
+                Attachments
+                {attachments.length > 0 && (
+                  <span className="ml-1.5 text-[#4B6BF5]">
+                    {attachments.length}
+                  </span>
+                )}
+              </span>
+            </div>
+            <svg className={`w-3 h-3 text-[#606080] transition-transform
+                            ${showAttachments ? 'rotate-180' : ''}`}
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+        <div className={showAttachments ? 'block' : 'hidden'}>
 
           {/* Area preview */}
           {areaPreview && (
@@ -683,7 +877,8 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
               />
             </div>
           )}
-        </div>
+        </div>{/* end collapsible attachments content */}
+        </div>{/* end attachments section */}
 
         {saveState === 'error' && (
           <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -693,12 +888,13 @@ export function SaveScreen({ onLogout, userEmail }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-3 pb-3 pt-2 border-t border-[#111]">
+      <div className="px-3 pb-4 pt-2.5 border-t border-[#313c5e] bg-[#12172a]">
         <button
           onClick={handleSave}
           disabled={isBusy || !!areaPreview}
-          className="w-full py-2.5 bg-[#4B6BF5] hover:bg-[#3b5bf5] disabled:opacity-40
-                     text-white text-[13px] font-medium rounded-xl transition-colors
+          className="w-full py-3 bg-[#4B6BF5] hover:bg-[#3452d0] disabled:opacity-40
+                     text-white text-[13px] font-semibold rounded-xl transition-colors
+                     shadow-lg shadow-[#4B6BF5]/20
                      flex items-center justify-center gap-2"
         >
           {isBusy ? (

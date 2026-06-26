@@ -122,3 +122,19 @@ export const tagsApi = {
     return apiFetch<{ items: { id: string; name: string; count: number }[] }>('/api/tags')
   },
 }
+
+
+
+export const collectionsApi = {
+  async list() {
+    return apiFetch<{ items: { id: string; name: string; icon: string; color: string }[] }>(
+      '/api/collections'
+    )
+  },
+  async addBookmark(collectionId: string, bookmarkId: string) {
+    return apiFetch(`/api/collections/${collectionId}/bookmarks`, {
+      method: 'POST',
+      body:   JSON.stringify({ bookmarkId }),
+    })
+  },
+}
