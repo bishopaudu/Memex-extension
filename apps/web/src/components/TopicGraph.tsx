@@ -90,6 +90,11 @@ export function TopicGraph({ onOpenTopic, onClose }: Props) {
   useEffect(() => { focusedRef.current  = focusedNode  }, [focusedNode])
 
   // Escape key handler
+  // Load and draw graph on mount
+  useEffect(() => {
+    loadAndDraw()
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
