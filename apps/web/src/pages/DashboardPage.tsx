@@ -11,6 +11,7 @@ import { CollectionDetailPage }   from './CollectionDetailPage'
 import { WikiPage }                from './WikiPage'
 import { ArchivePage }             from './ArchivePage'
 import { BulkActionBar }           from '../components/BulkActionBar'
+import { GettingStarted }          from '../components/GettingStarted'
 import { ProfileModal }            from '../components/ProfileModal'
 import { ReadingListPage }         from './ReadingListPage'
 import { TopicPage }               from './TopicPage'
@@ -337,6 +338,18 @@ export function DashboardPage(_props: Props) {
                   <button onClick={() => setActiveTag('')} className="hover:text-white ml-0.5">×</button>
                 </span>
               </div>
+            )}
+
+            {/* Getting started — shown to new users */}
+            {!activeTag && !activeCollection && !debouncedSearch && (
+              <GettingStarted
+                bookmarkCount={bookmarks.length}
+                topicCount={topics.length}
+                collectionCount={collections.length}
+                hasExtension={false}
+                onOpenWiki={() => setPage({ type: 'wiki' })}
+                onOpenCollections={() => setPage({ type: 'collections' })}
+              />
             )}
 
             {!loading && (
