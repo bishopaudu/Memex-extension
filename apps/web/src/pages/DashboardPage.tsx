@@ -374,14 +374,36 @@ export function DashboardPage(_props: Props) {
                     <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-ink-2 mb-1">
-                  {debouncedSearch || activeTag ? 'Nothing found' : 'No bookmarks yet'}
+                <p className="text-sm font-medium text-ink-2 mb-2">
+                  {debouncedSearch || activeTag ? 'Nothing found' : 'Your library is empty'}
                 </p>
-                <p className="text-xs text-ink-4 max-w-xs">
+                <p className="text-xs text-ink-4 max-w-xs leading-relaxed mb-4">
                   {debouncedSearch || activeTag
                     ? 'Try a different search or filter'
-                    : 'Use the Memex extension to save your first bookmark'}
+                    : 'Install the extension and save anything from the web with one click'}
                 </p>
+                {!debouncedSearch && !activeTag && (
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    
+                      <a href="https://addons.mozilla.org/firefox/addon/memex-visual-bookmarks"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-brand
+                                 text-white text-xs font-medium rounded-xl
+                                 hover:bg-brand/90 transition-colors"
+                    >
+                      🦊 Firefox extension
+                    </a>
+                    
+                     <a  href="/explore"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-surface-3
+                                 border border-surface-4 text-ink-2 text-xs font-medium
+                                 rounded-xl hover:bg-surface-4 transition-colors"
+                    >
+                      🌍 Browse explore
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
